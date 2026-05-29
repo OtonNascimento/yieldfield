@@ -1,0 +1,44 @@
+# ── Secrets & environment ───────────────────────────────────────────────────
+# §16: only .env.example is committed; never real env values or secrets.
+.env
+.env.*
+!.env.example
+
+# ── Python / backend ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.hypothesis/
+
+# ── Node / frontend ─────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+
+# ── Contracts (generated artifacts are reproducible) ────────────────────────
+# The OpenAPI schema and generated client are emitted from the backend (§10).
+# Tracked vs. generated policy is revisited in Slice 3/4; ignore local builds.
+contracts/generated/**/node_modules/
+
+# ── Tooling / editors / OS ──────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# ── Docker / local data volumes ─────────────────────────────────────────────
+.docker-data/
