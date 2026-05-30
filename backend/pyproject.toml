@@ -15,6 +15,11 @@ dependencies = [
     "celery[redis]>=5.4",
     "redis>=5.2",
     "structlog>=24.4",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "clickhouse-connect>=0.8",
+    "stripe>=11",
 ]
 
 [dependency-groups]
@@ -29,6 +34,7 @@ dev = [
     "hypothesis>=6.122",
     "httpx>=0.28",
     "import-linter>=2.1",
+    "testcontainers>=4.8",
 ]
 
 [build-system]
@@ -75,11 +81,19 @@ files = ["src", "tests"]
 module = ["celery.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# These ship without (complete) PEP 561 stubs; scope narrowly so strictness holds elsewhere.
+module = ["clickhouse_connect.*", "testcontainers.*", "stripe.*", "alembic.*"]
+ignore_missing_imports = true
+
 # ── pytest + coverage ────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 pythonpath = ["src"]
+markers = [
+    "integration: requires Docker-backed services (Postgres/ClickHouse/stripe-mock); skipped when Docker is unavailable",
+]
 
 [tool.coverage.run]
 source = ["yieldfield"]
@@ -114,6 +128,7 @@ forbidden_modules = [
     "requests",
     "pydantic",
     "pydantic_settings",
+    "stripe",
 ]
 
 [[tool.importlinter.contracts]]
