@@ -88,8 +88,9 @@ Add mypy overrides (third-party libs without bundled stubs) after the existing `
 
 ```toml
 [[tool.mypy.overrides]]
-# These ship without (complete) PEP 561 stubs; scope narrowly so strictness holds elsewhere.
-module = ["clickhouse_connect.*", "testcontainers.*", "stripe.*", "alembic.*"]
+# clickhouse-connect and testcontainers ship without PEP 561 stubs; scope narrowly so
+# strictness holds elsewhere. (stripe and alembic ship py.typed — no override needed.)
+module = ["clickhouse_connect.*", "testcontainers.*"]
 ignore_missing_imports = true
 ```
 
