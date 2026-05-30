@@ -1,0 +1,21 @@
+# Yieldfield Celery worker image (§13 — out-of-band jobs).
+# Identical build to the API image; only the entrypoint differs (the worker runs
+# the queue consumer rather than the HTTP server).
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+COPY backend/ ./
+RUN uv sync --frozen --no-dev
+
+CMD ["uv", "run", "celery", "-A", "yieldfield.workers.celery_app", "worker", "--loglevel=info"]

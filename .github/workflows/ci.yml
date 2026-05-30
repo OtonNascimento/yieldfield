@@ -1,0 +1,87 @@
+name: CI
+
+# Trunk-based: every PR must be green on lint, format, type-check, unit tests,
+# import boundaries, contract check, and build before merge (§14, §15).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: backend (lint · format · types · boundaries · tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (also provisions Python 3.12)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (Ruff)
+        run: uv run ruff check .
+
+      - name: Format check (Black)
+        run: uv run black --check .
+
+      - name: Type-check (mypy --strict)
+        run: uv run mypy
+
+      - name: Import boundaries (domain purity, §6.1/§6.4)
+        run: uv run lint-imports
+
+      - name: Unit tests (money paths hardest, §7)
+        run: uv run pytest
+
+  frontend:
+    name: frontend (types · lint · css · format · tests · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (tsc strict)
+        run: npm run typecheck
+
+      - name: Lint (ESLint — hex + layer-boundary guards, §5A/§6.3)
+        run: npm run lint
+
+      - name: Lint CSS (Stylelint — hex guard, §5A)
+        run: npm run lint:css
+
+      - name: Format check (Prettier)
+        run: npm run format:check
+
+      - name: Unit tests (Vitest)
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  contract:
+    name: contract (OpenAPI drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: OpenAPI contract check
+        # Becomes a real schema-drift check in Slice 3, when the backend emits
+        # contracts/openapi/openapi.json and the client is generated from it (§10).
+        run: echo "Contract check activates in Slice 3 (no API surface emitted yet)."

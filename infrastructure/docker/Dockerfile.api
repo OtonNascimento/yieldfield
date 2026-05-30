@@ -1,0 +1,24 @@
+# Yieldfield API image (§15 — reproducible per-service images).
+# Build context is the repo root so the backend package can be copied wholesale.
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+# uv provides the Python toolchain + dependency resolution (ADR-0001).
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+# Install dependencies first (cached) using only the lockfiles.
+COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Then the application source, and install the project itself.
+COPY backend/ ./
+RUN uv sync --frozen --no-dev
+
+EXPOSE 8000
+CMD ["uv", "run", "uvicorn", "yieldfield.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

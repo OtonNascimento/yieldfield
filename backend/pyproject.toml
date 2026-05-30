@@ -1,0 +1,138 @@
+[project]
+name = "yieldfield"
+version = "0.0.0"
+description = "Yieldfield backend — finds revenue lost in usage-based billing (financial logic only)."
+requires-python = ">=3.12"
+# Runtime dependencies. Slice 0 ships only what the runnable shells need:
+# the HTTP adapter (FastAPI), typed settings (pydantic-settings), the async
+# backbone (Celery + Redis), and structured logging. Persistence/connector/
+# scoring dependencies are added in their own slices (§12, §17, §5 scoring).
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "celery[redis]>=5.4",
+    "redis>=5.2",
+    "structlog>=24.4",
+]
+
+[dependency-groups]
+# Dev tooling that enforces the §14/§15 invariants: lint, format, type-check,
+# tests, and the import-boundary guard (import-linter, §6.1/§6.4).
+dev = [
+    "ruff>=0.8",
+    "black>=24.10",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.122",
+    "httpx>=0.28",
+    "import-linter>=2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yieldfield"]
+
+# ── Ruff: lint (Black owns formatting) ───────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "C4", "PTH", "RUF"]
+# E501 (line length) is owned by Black, not Ruff, to avoid a two-tool conflict.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use `assert` (S101) — that is their job.
+"tests/**" = ["S101"]
+
+# ── Black: formatting ────────────────────────────────────────────────────────
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+# ── mypy: strict, end to end (§7, §10) ───────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+# Celery does not ship PEP 561 type stubs; do not let that weaken strictness
+# elsewhere. Scoped narrowly to the Celery namespace only.
+module = ["celery.*"]
+ignore_missing_imports = true
+
+# ── pytest + coverage ────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["yieldfield"]
+branch = true
+
+# ── import-linter: the domain-purity / inward-dependency guard (§6.1, §6.4) ──
+# This is the backend half of Slice 0's mandated import-boundary lint. Run with
+# `uv run lint-imports`. It fails the build if the domain imports a framework or
+# an outer layer, enforcing PROJECT_CONTEXT §6.1/§6.4 and the ARCHITECTURE
+# dependency rule (api -> application -> domain <- infrastructure).
+[tool.importlinter]
+root_package = "yieldfield"
+# Required because the domain-purity contract names external packages
+# (fastapi, sqlalchemy, …) as forbidden imports.
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain is framework-pure (no FastAPI/ORM/HTTP/I-O imports)"
+type = "forbidden"
+source_modules = ["yieldfield.domain"]
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "uvicorn",
+    "sqlalchemy",
+    "alembic",
+    "psycopg",
+    "clickhouse_connect",
+    "celery",
+    "redis",
+    "httpx",
+    "requests",
+    "pydantic",
+    "pydantic_settings",
+]
+
+[[tool.importlinter.contracts]]
+name = "Dependencies point inward (api -> application -> domain)"
+type = "layers"
+layers = [
+    "yieldfield.api",
+    "yieldfield.application",
+    "yieldfield.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain imports no outer layer (infrastructure/api/application/workers/config)"
+type = "forbidden"
+source_modules = ["yieldfield.domain"]
+forbidden_modules = [
+    "yieldfield.infrastructure",
+    "yieldfield.api",
+    "yieldfield.application",
+    "yieldfield.workers",
+    "yieldfield.config",
+]

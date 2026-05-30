@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repository for all text files so the
+# scaffold is identical across the win32 dev box and Linux CI/containers (§15).
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary

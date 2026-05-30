@@ -1,0 +1,105 @@
+# One-command local stack (PROJECT_CONTEXT §15) — a fresh engineer runs `docker
+# compose up` and has the whole system the same day. Service choices per ADR-0001:
+# PostgreSQL (OLTP), ClickHouse (OLAP), Redis (Celery broker/backend).
+#
+# Datastore credentials here are LOCAL-ONLY and non-secret; production secrets come
+# from a secrets manager, never from a committed file (§11, §16).
+
+name: yieldfield
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yieldfield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yieldfield}
+      POSTGRES_DB: ${POSTGRES_DB:-yieldfield}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yieldfield} -d ${POSTGRES_DB:-yieldfield}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-yieldfield}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-yieldfield}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-yieldfield}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    environment: &backend-env
+      YIELDFIELD_ENVIRONMENT: local
+      YIELDFIELD_LOG_LEVEL: INFO
+      YIELDFIELD_LOG_JSON: "true"
+      YIELDFIELD_REDIS_URL: redis://redis:6379/0
+      YIELDFIELD_DATABASE_URL: postgresql://${POSTGRES_USER:-yieldfield}:${POSTGRES_PASSWORD:-yieldfield}@postgres:5432/${POSTGRES_DB:-yieldfield}
+      YIELDFIELD_CLICKHOUSE_URL: http://${CLICKHOUSE_USER:-yieldfield}:${CLICKHOUSE_PASSWORD:-yieldfield}@clickhouse:8123/${CLICKHOUSE_DB:-yieldfield}
+      YIELDFIELD_CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  clickhouse-data:

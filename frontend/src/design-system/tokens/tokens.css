@@ -1,0 +1,68 @@
+/*
+ * Yieldfield Design System — token contract (§5A).
+ *
+ * This is the ONE place raw color values live; every other layer references these
+ * via var(). Light tokens sit on :root; dark overrides under [data-theme="dark"].
+ *
+ * SCOPE NOTE (Slice 0): `--brand` is the authoritative value from PROJECT_CONTEXT
+ * §5A (#605853, theme-invariant). The remaining values below are PROVISIONAL
+ * structural placeholders so the theme flip and the token boundary are real and
+ * demonstrable now. Slice 4 replaces every non-brand value with the exact palette
+ * from the delivered design-system/reference/styles.css. Names are stable; values
+ * are not final until that port.
+ */
+
+:root {
+  /* Brand — theme-invariant, never overridden (§5A). Authoritative value. */
+  --brand: #605853;
+
+  /* Surfaces */
+  --ds-bg: #f7f5f2;
+  --ds-surface: #fff;
+  --ds-surface-raised: #fbfaf8;
+  --ds-line: #e3ddd6;
+
+  /* Text */
+  --ds-text: #2b2724;
+  --ds-text-muted: #6f675f;
+
+  /* Status palette: critical / high / medium / low / good — paired text + tint,
+     mapped 1:1 onto the §8 domain severity/status enums. */
+  --ds-status-critical-text: #8c2f2a;
+  --ds-status-critical-tint: #f3dedc;
+  --ds-status-high-text: #9a5a23;
+  --ds-status-high-tint: #f4e3d2;
+  --ds-status-medium-text: #8a7320;
+  --ds-status-medium-tint: #f0e9cf;
+  --ds-status-low-text: #4f6b54;
+  --ds-status-low-tint: #dfe9df;
+  --ds-status-good-text: #2f6b57;
+  --ds-status-good-tint: #d8e9e1;
+
+  /* Typography roles (§5A): Lora for numerals/titles, DM Sans body, IBM Plex Mono
+     micro-labels. Font files are linked in Slice 4; stacks degrade gracefully. */
+  --ds-font-serif: 'Lora', 'Georgia', serif;
+  --ds-font-sans: 'DM Sans', system-ui, sans-serif;
+  --ds-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+[data-theme='dark'] {
+  --ds-bg: #1c1a18;
+  --ds-surface: #26231f;
+  --ds-surface-raised: #2d2925;
+  --ds-line: #3a352f;
+
+  --ds-text: #efe9e2;
+  --ds-text-muted: #a89f95;
+
+  --ds-status-critical-text: #e8a6a0;
+  --ds-status-critical-tint: #3a2421;
+  --ds-status-high-text: #e0b083;
+  --ds-status-high-tint: #352a1d;
+  --ds-status-medium-text: #d8c576;
+  --ds-status-medium-tint: #322d1b;
+  --ds-status-low-text: #a7c2ab;
+  --ds-status-low-tint: #232c24;
+  --ds-status-good-text: #8fcab1;
+  --ds-status-good-tint: #1f2c26;
+}

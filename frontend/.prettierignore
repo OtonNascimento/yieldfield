@@ -1,0 +1,5 @@
+dist
+node_modules
+coverage
+# Delivered design-system originals are preserved verbatim (§5A) — never reformatted.
+src/design-system/reference
