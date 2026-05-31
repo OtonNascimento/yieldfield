@@ -81,3 +81,22 @@ def clickhouse_store() -> Iterator[Any]:
         yield store
     finally:
         container.stop()
+
+
+@pytest.fixture(scope="session")
+def stripe_mock_base_url() -> Iterator[str]:
+    try:
+        from testcontainers.core.container import DockerContainer
+        from testcontainers.core.waiting_utils import wait_for_logs
+
+        container = DockerContainer("stripe/stripe-mock:latest").with_exposed_ports(12111)
+        container.start()
+        wait_for_logs(container, "Listening", timeout=30)
+    except Exception as exc:  # any startup failure means Docker isn't available here
+        pytest.skip(f"Docker/testcontainers unavailable: {exc}")
+    try:
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(12111)
+        yield f"http://{host}:{port}"
+    finally:
+        container.stop()
