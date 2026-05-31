@@ -35,9 +35,14 @@ ORDER BY (tenant_id, occurred_at, id)
 """
 
 
-def _as_utc_naive(moment: datetime) -> datetime:
-    """ClickHouse DateTime64('UTC') binds best with UTC-normalized naive datetimes."""
-    return moment.astimezone(UTC).replace(tzinfo=None)
+def _as_utc(moment: datetime) -> datetime:
+    """Normalize to a tz-aware UTC datetime for ClickHouse DateTime64('UTC').
+
+    clickhouse-connect interprets *naive* datetimes as the local timezone, which shifts the
+    stored/queried instant (e.g. by the host's UTC offset). Passing tz-aware UTC stores and
+    compares the exact instant correctly.
+    """
+    return moment.astimezone(UTC)
 
 
 class ClickHouseUsageEventStore:
@@ -62,7 +67,7 @@ class ClickHouseUsageEventStore:
                     event.customer_id,
                     event.metric,
                     event.quantity,
-                    _as_utc_naive(event.occurred_at),
+                    _as_utc(event.occurred_at),
                 ]
             )
         if rows:
@@ -76,8 +81,8 @@ class ClickHouseUsageEventStore:
             "ORDER BY occurred_at, id",
             parameters={
                 "tid": str(tenant_id),
-                "start": _as_utc_naive(window.start),
-                "end": _as_utc_naive(window.end),
+                "start": _as_utc(window.start),
+                "end": _as_utc(window.end),
             },
         )
         return [self._to_event(row) for row in result.result_rows]
