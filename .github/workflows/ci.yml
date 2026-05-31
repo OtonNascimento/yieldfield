@@ -38,7 +38,29 @@ jobs:
         run: uv run lint-imports
 
       - name: Unit tests (money paths hardest, §7)
-        run: uv run pytest
+        run: uv run pytest -m "not integration"
+
+  integration:
+    name: backend integration (Postgres · ClickHouse · stripe-mock)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (also provisions Python 3.12)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Integration tests (testcontainers: Postgres/ClickHouse/stripe-mock, §11/§12/§15)
+        # GitHub ubuntu runners provide Docker for testcontainers + stripe-mock. This also
+        # runs `alembic upgrade head` against a disposable Postgres via the test fixtures.
+        run: uv run pytest -m integration -v
 
   frontend:
     name: frontend (types · lint · css · format · tests · build)
