@@ -30,6 +30,14 @@ class TenantRow(Base):
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Relationships exist so that SQLAlchemy's unit-of-work topological sort respects
+    # FK ordering when TenantRow and its children are added to the same session without
+    # being linked through the ORM object graph (e.g. integration tests, bulk inserts).
+    plans: Mapped[list[PlanRow]] = relationship(back_populates="tenant")
+    contracts: Mapped[list[ContractRow]] = relationship(back_populates="tenant")
+    invoices: Mapped[list[InvoiceRow]] = relationship(back_populates="tenant")
+    reconciliations: Mapped[list[ReconciliationRow]] = relationship(back_populates="tenant")
+    findings: Mapped[list[FindingRow]] = relationship(back_populates="tenant")
 
 
 class PlanRow(Base):
@@ -43,6 +51,7 @@ class PlanRow(Base):
     metric: Mapped[str] = mapped_column(Text, nullable=False)
     unit_price_amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     unit_price_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    tenant: Mapped[TenantRow] = relationship(back_populates="plans")
 
 
 class ContractRow(Base):
@@ -56,6 +65,7 @@ class ContractRow(Base):
     plan_id: Mapped[str] = mapped_column(Text, ForeignKey("plans.id"), nullable=False)
     term_start: Mapped[datetime] = mapped_column(_TS, nullable=False)
     term_end: Mapped[datetime] = mapped_column(_TS, nullable=False)
+    tenant: Mapped[TenantRow] = relationship(back_populates="contracts")
 
 
 class InvoiceRow(Base):
@@ -75,6 +85,7 @@ class InvoiceRow(Base):
         lazy="selectin",
         order_by="InvoiceLineItemRow.id",
     )
+    tenant: Mapped[TenantRow] = relationship(back_populates="invoices")
 
 
 class InvoiceLineItemRow(Base):
@@ -108,6 +119,7 @@ class ReconciliationRow(Base):
         lazy="selectin",
         order_by="FindingRow.id",
     )
+    tenant: Mapped[TenantRow] = relationship(back_populates="reconciliations")
 
 
 class FindingRow(Base):
@@ -135,3 +147,4 @@ class FindingRow(Base):
     lineage_invoice_line_item_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     lineage_model_run_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     reconciliation: Mapped[ReconciliationRow] = relationship(back_populates="findings")
+    tenant: Mapped[TenantRow] = relationship(back_populates="findings")
