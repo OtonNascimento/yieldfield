@@ -20,3 +20,22 @@ def test_normalize_leaves_explicit_driver_untouched() -> None:
 def test_create_engine_without_url_fails_fast() -> None:
     with pytest.raises(PersistenceError, match="DATABASE_URL"):
         create_db_engine(None)
+
+
+def test_plan_repo_rejects_tenant_mismatch_before_touching_db() -> None:
+    from yieldfield.domain.billing.plan import Plan
+    from yieldfield.domain.shared.ids import PlanId, TenantId
+    from yieldfield.domain.shared.money import Money
+    from yieldfield.infrastructure.persistence.errors import PersistenceError
+    from yieldfield.infrastructure.persistence.repositories import SqlAlchemyPlanRepository
+
+    repo = SqlAlchemyPlanRepository(session=None)  # type: ignore[arg-type]  # guard runs before any session use
+    plan = Plan(
+        id=PlanId("pl_1"),
+        tenant_id=TenantId("t_OTHER"),
+        name="p",
+        metric="m",
+        unit_price=Money.of("1", "USD"),
+    )
+    with pytest.raises(PersistenceError, match="does not match"):
+        repo.add(TenantId("t_1"), plan)
