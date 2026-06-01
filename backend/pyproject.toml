@@ -19,7 +19,11 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "clickhouse-connect>=0.8",
-    "stripe>=11",
+    # The connector uses the v15 typed client (`StripeClient.v1`, Billing meter
+    # event summaries); the older usage-records API was removed in 15. Pin to the
+    # major we build against so a lockfile-less install can't resolve an
+    # incompatible v11–v14 and break at import (§17).
+    "stripe>=15,<16",
 ]
 
 [dependency-groups]
