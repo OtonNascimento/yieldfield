@@ -70,6 +70,7 @@ backend/
 │       │   │   ├── orb/
 │       │   │   └── lago/
 │       │   ├── scoring_engine/  # Concrete Bayesian/ML implementations of scoring ports
+│       │   ├── security/        # Secrets-at-rest: credential cipher (envelope-ready) — §11
 │       │   ├── messaging/       # Queue producers/consumers, job orchestration
 │       │   └── notifications/   # Slack/email outbound adapters
 │       │
@@ -107,6 +108,7 @@ backend/
 | `infrastructure/connectors/` | Billing integrations | One plugin per billing platform, all implementing the same port | Connector packages | §17 — connectors are the primary growth axis |
 | `infrastructure/connectors/base/` | The connector contract | Define authenticate / pull events / pull invoices / verify webhook | Abstract port, shared connector utilities | §17 — adding a connector = implementing this, nothing else |
 | `infrastructure/scoring_engine/` | Concrete models | Implement the scoring port with Bayesian/ML code | PyMC/NumPyro/sklearn implementations | §6.4 — isolated so models evolve freely |
+| `infrastructure/security/` | Secrets at rest | Encrypt/decrypt connector credentials behind a cipher port | `CredentialCipher` + Fernet impl | §11 — credentials encrypted at rest, envelope-ready |
 | `infrastructure/messaging/` | Async backbone | Produce/consume jobs; orchestrate multi-step runs | Queue adapters, orchestration definitions | §13 — horizontal, resumable processing |
 | `infrastructure/notifications/` | Outbound alerts | Send Slack/email when material leakage found | Notification adapters | §4 NICE-TO-HAVE alerting |
 | `api/` | HTTP adapter | Validate input, call application services, serialize output | Routers, DTOs, dependencies | §10 — thin boundary, no logic |

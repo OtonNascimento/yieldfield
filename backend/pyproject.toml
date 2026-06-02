@@ -24,6 +24,9 @@ dependencies = [
     # major we build against so a lockfile-less install can't resolve an
     # incompatible v11–v14 and break at import (§17).
     "stripe>=15,<16",
+    # Fernet symmetric encryption for connector credentials at rest (§11). Behind the
+    # CredentialCipher seam, so an envelope/KMS impl can replace it later (§17).
+    "cryptography>=43",
 ]
 
 [dependency-groups]
@@ -156,3 +159,9 @@ forbidden_modules = [
     "yieldfield.workers",
     "yieldfield.config",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Application depends only on the domain (not infrastructure)"
+type = "forbidden"
+source_modules = ["yieldfield.application"]
+forbidden_modules = ["yieldfield.infrastructure"]
