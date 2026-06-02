@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     database_url: str | None = None  # PostgreSQL OLTP (source of truth)
     clickhouse_url: str | None = None  # ClickHouse OLAP (usage events at scale)
 
+    # ── Connector credentials & auth (§11, §16) — required when used ──────────
+    # Fernet key for the credential cipher; required only when a connector is
+    # registered/used (built lazily; fails fast there if absent).
+    credentials_key: str | None = None
+    # Bearer-token → tenant_id map backing the request auth dependency (Plan 3C).
+    # Parsed from a JSON object in YIELDFIELD_API_TOKENS.
+    api_tokens: dict[str, str] = Field(default_factory=dict)
+    # Feature flag gating live billing-platform pulls (DoD: risky work behind a flag).
+    ingestion_enabled: bool = False
+
     @property
     def celery_broker_url(self) -> str:
         """Celery broker URL — Redis in the local/CI stack (ADR-0001)."""

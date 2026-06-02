@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from yieldfield.config.settings import Settings
 
 
@@ -21,3 +23,24 @@ def test_environment_override(monkeypatch) -> None:  # type: ignore[no-untyped-d
     assert settings.environment == "staging"
     assert settings.log_level == "WARNING"
     assert settings.is_production is False
+
+
+def test_slice3_defaults() -> None:
+    from yieldfield.config.settings import Settings
+
+    settings = Settings()
+    assert settings.ingestion_enabled is False
+    assert settings.api_tokens == {}
+    assert settings.credentials_key is None
+
+
+def test_slice3_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    from yieldfield.config.settings import Settings
+
+    monkeypatch.setenv("YIELDFIELD_INGESTION_ENABLED", "true")
+    monkeypatch.setenv("YIELDFIELD_API_TOKENS", '{"tok_abc": "tenant-1"}')
+    monkeypatch.setenv("YIELDFIELD_CREDENTIALS_KEY", "test-key")
+    settings = Settings()
+    assert settings.ingestion_enabled is True
+    assert settings.api_tokens == {"tok_abc": "tenant-1"}
+    assert settings.credentials_key == "test-key"
