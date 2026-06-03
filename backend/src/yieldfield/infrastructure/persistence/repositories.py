@@ -115,6 +115,11 @@ class SqlAlchemyInvoiceRepository:
 
     def add(self, tenant_id: TenantId, invoice: Invoice) -> None:
         _guard(tenant_id, invoice.tenant_id)
+        existing = self._session.get(InvoiceRow, str(invoice.id))
+        if existing is not None:
+            _guard(tenant_id, existing.tenant_id)
+            self._session.delete(existing)  # cascade removes its line items
+            self._session.flush()
         self._session.add(mappers.invoice_row(invoice))
 
     def get(self, tenant_id: TenantId, invoice_id: InvoiceId) -> Invoice | None:
@@ -144,6 +149,11 @@ class SqlAlchemyReconciliationRepository:
 
     def add(self, tenant_id: TenantId, reconciliation: Reconciliation) -> None:
         _guard(tenant_id, reconciliation.tenant_id)
+        existing = self._session.get(ReconciliationRow, str(reconciliation.id))
+        if existing is not None:
+            _guard(tenant_id, existing.tenant_id)
+            self._session.delete(existing)  # cascade removes its findings
+            self._session.flush()
         self._session.add(mappers.reconciliation_row(reconciliation))
 
     def get(

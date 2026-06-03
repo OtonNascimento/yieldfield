@@ -167,3 +167,52 @@ def test_cross_tenant_reads_are_isolated(session: Session) -> None:
     assert plans.get(TenantId("t_B"), PlanId("pl_A")) is None  # B cannot read A's plan
     assert plans.list_for_tenant(TenantId("t_B")) == []
     assert plans.get(TenantId("t_A"), PlanId("pl_A")) is not None
+
+
+@pytest.mark.integration
+def test_invoice_add_is_idempotent(session: Session) -> None:
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from yieldfield.domain.billing.invoice import Invoice, InvoiceLineItem
+    from yieldfield.domain.billing.tenant import Tenant
+    from yieldfield.domain.shared.ids import InvoiceId, InvoiceLineItemId, TenantId
+    from yieldfield.domain.shared.money import Money
+    from yieldfield.domain.shared.time_window import TimeWindow
+    from yieldfield.infrastructure.persistence.repositories import (
+        SqlAlchemyInvoiceRepository,
+        SqlAlchemyTenantRepository,
+    )
+
+    tid = TenantId("tenant-idem")
+    SqlAlchemyTenantRepository(session).add(Tenant(id=tid, name="Idem"))
+    session.flush()
+    repo = SqlAlchemyInvoiceRepository(session)
+    period = TimeWindow(datetime(2026, 5, 1, tzinfo=UTC), datetime(2026, 6, 1, tzinfo=UTC))
+
+    def build(amount: str) -> Invoice:
+        return Invoice(
+            id=InvoiceId("inv_1"),
+            tenant_id=tid,
+            customer_id="cus_1",
+            period=period,
+            currency="USD",
+            line_items=(
+                InvoiceLineItem(
+                    id=InvoiceLineItemId("li_1"),
+                    metric="api_calls",
+                    quantity=Decimal("10"),
+                    amount=Money.of(amount, "USD"),
+                ),
+            ),
+        )
+
+    repo.add(tid, build("100"))
+    session.flush()
+    repo.add(tid, build("250"))  # same id again — must replace, not duplicate
+    session.flush()
+
+    stored = repo.get(tid, InvoiceId("inv_1"))
+    assert stored is not None
+    assert stored.total() == Money.of("250", "USD")
+    assert len(stored.line_items) == 1  # line items replaced, not accumulated
