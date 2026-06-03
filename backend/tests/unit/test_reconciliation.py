@@ -11,7 +11,7 @@ from yieldfield.domain.findings.leakage_type import LeakageType
 from yieldfield.domain.findings.recovery_status import RecoveryStatus
 from yieldfield.domain.findings.severity import Severity
 from yieldfield.domain.reconciliation.reconciliation import Reconciliation
-from yieldfield.domain.shared.errors import CurrencyMismatchError
+from yieldfield.domain.shared.errors import CurrencyMismatchError, InvalidEntityError
 from yieldfield.domain.shared.ids import FindingId, ReconciliationId, TenantId
 from yieldfield.domain.shared.money import Money
 from yieldfield.domain.shared.time_window import TimeWindow
@@ -79,3 +79,15 @@ def test_reconciliation_carries_audit_fields() -> None:
     assert recon.executed_at == executed
     assert recon.rule_version == "reconciliation-v1"
     assert recon.finding_count == 0
+
+
+def test_reconciliation_rejects_naive_executed_at() -> None:
+    with pytest.raises(InvalidEntityError):
+        Reconciliation(
+            id=ReconciliationId("rec_1"),
+            tenant_id=TenantId("t_1"),
+            window=_window(),
+            currency="USD",
+            executed_at=datetime(2026, 6, 1),  # naive — no tzinfo
+            rule_version="reconciliation-v1",
+        )

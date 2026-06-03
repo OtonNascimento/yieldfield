@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from yieldfield.domain.findings.finding import Finding
+from yieldfield.domain.shared.errors import InvalidEntityError
 from yieldfield.domain.shared.ids import ReconciliationId, TenantId
 from yieldfield.domain.shared.money import Money
 from yieldfield.domain.shared.time_window import TimeWindow
@@ -25,6 +26,10 @@ class Reconciliation:
     executed_at: datetime
     rule_version: str
     findings: tuple[Finding, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.executed_at.tzinfo is None:
+            raise InvalidEntityError("Reconciliation.executed_at must be timezone-aware.")
 
     def total_leakage(self) -> Money:
         """Total recoverable leakage across all findings (§2). Currency-checked."""

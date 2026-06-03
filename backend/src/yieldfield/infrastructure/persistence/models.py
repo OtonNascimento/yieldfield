@@ -114,6 +114,7 @@ class ReconciliationRow(Base):
     window_end: Mapped[datetime] = mapped_column(_TS, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     executed_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=func.now())
+    # Matches DEFAULT_RULE_VERSION in matching.py — keep in sync; DB defaults must be literals.
     rule_version: Mapped[str] = mapped_column(
         Text, nullable=False, server_default="reconciliation-v1"
     )
