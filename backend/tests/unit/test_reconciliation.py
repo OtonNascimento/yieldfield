@@ -43,6 +43,8 @@ def _reconciliation(*findings: Finding, currency: str = "USD") -> Reconciliation
         tenant_id=TenantId("t_1"),
         window=_window(),
         currency=currency,
+        executed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        rule_version="reconciliation-v1",
         findings=findings,
     )
 
@@ -62,3 +64,18 @@ class TestReconciliation:
         recon = _reconciliation(_finding("f_1", "10.00", "USD"), _finding("f_2", "5.00", "EUR"))
         with pytest.raises(CurrencyMismatchError):
             recon.total_leakage()
+
+
+def test_reconciliation_carries_audit_fields() -> None:
+    executed = datetime(2026, 6, 1, tzinfo=UTC)
+    recon = Reconciliation(
+        id=ReconciliationId("rec_1"),
+        tenant_id=TenantId("t_1"),
+        window=_window(),
+        currency="USD",
+        executed_at=executed,
+        rule_version="reconciliation-v1",
+    )
+    assert recon.executed_at == executed
+    assert recon.rule_version == "reconciliation-v1"
+    assert recon.finding_count == 0

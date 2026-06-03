@@ -85,6 +85,8 @@ def test_reconciliation_round_trip_preserves_findings_and_lineage() -> None:
         tenant_id=TenantId("t_1"),
         window=_WINDOW,
         currency="USD",
+        executed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        rule_version="reconciliation-v1",
         findings=(finding,),
     )
     restored = mappers.to_reconciliation(mappers.reconciliation_row(recon))

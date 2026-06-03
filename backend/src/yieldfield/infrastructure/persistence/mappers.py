@@ -210,6 +210,8 @@ def reconciliation_row(recon: Reconciliation) -> ReconciliationRow:
         window_start=recon.window.start,
         window_end=recon.window.end,
         currency=recon.currency,
+        executed_at=recon.executed_at,
+        rule_version=recon.rule_version,
     )
     row.findings = [finding_row(f, TenantId(recon.tenant_id)) for f in recon.findings]
     return row
@@ -221,5 +223,7 @@ def to_reconciliation(row: ReconciliationRow) -> Reconciliation:
         tenant_id=TenantId(row.tenant_id),
         window=TimeWindow(row.window_start, row.window_end),
         currency=row.currency,
+        executed_at=row.executed_at,
+        rule_version=row.rule_version,
         findings=tuple(to_finding(fr) for fr in row.findings),
     )

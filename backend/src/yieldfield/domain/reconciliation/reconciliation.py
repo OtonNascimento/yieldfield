@@ -8,6 +8,7 @@ application/worker concern (§13), added in Slice 3; this is the pure result ent
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from yieldfield.domain.findings.finding import Finding
 from yieldfield.domain.shared.ids import ReconciliationId, TenantId
@@ -21,6 +22,8 @@ class Reconciliation:
     tenant_id: TenantId
     window: TimeWindow
     currency: str
+    executed_at: datetime
+    rule_version: str
     findings: tuple[Finding, ...] = ()
 
     def total_leakage(self) -> Money:

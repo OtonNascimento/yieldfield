@@ -104,6 +104,8 @@ def test_reconciliation_persists_findings_and_reads_back(session: Session) -> No
         tenant_id=TenantId("t_1"),
         window=_WINDOW,
         currency="USD",
+        executed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        rule_version="reconciliation-v1",
         findings=(finding,),
     )
     SqlAlchemyReconciliationRepository(session).add(TenantId("t_1"), recon)
@@ -139,6 +141,8 @@ def test_finding_status_update_persists(session: Session) -> None:
         tenant_id=TenantId("t_1"),
         window=_WINDOW,
         currency="USD",
+        executed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        rule_version="reconciliation-v1",
         findings=(finding,),
     )
     repo = SqlAlchemyFindingRepository(session)

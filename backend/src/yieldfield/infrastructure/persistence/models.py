@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from sqlalchemy import ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime
@@ -113,6 +113,10 @@ class ReconciliationRow(Base):
     window_start: Mapped[datetime] = mapped_column(_TS, nullable=False)
     window_end: Mapped[datetime] = mapped_column(_TS, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    executed_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=func.now())
+    rule_version: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="reconciliation-v1"
+    )
     findings: Mapped[list[FindingRow]] = relationship(
         back_populates="reconciliation",
         cascade="all, delete-orphan",
