@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from yieldfield.domain.billing.connector import Connector
 from yieldfield.domain.billing.contract import Contract
 from yieldfield.domain.billing.invoice import Invoice
 from yieldfield.domain.billing.plan import Plan
@@ -19,6 +20,7 @@ from yieldfield.domain.billing.tenant import Tenant
 from yieldfield.domain.findings.finding import Finding
 from yieldfield.domain.reconciliation.reconciliation import Reconciliation
 from yieldfield.domain.shared.ids import (
+    ConnectorId,
     ContractId,
     FindingId,
     InvoiceId,
@@ -30,6 +32,7 @@ from yieldfield.domain.shared.time_window import TimeWindow
 from yieldfield.infrastructure.persistence import mappers
 from yieldfield.infrastructure.persistence.errors import PersistenceError
 from yieldfield.infrastructure.persistence.models import (
+    ConnectorRow,
     ContractRow,
     FindingRow,
     InvoiceRow,
@@ -200,3 +203,47 @@ class SqlAlchemyFindingRepository:
         row.amount_amount = mappers._storable(finding.amount.amount, "amount")
         row.amount_currency = finding.amount.currency
         row.explanation = finding.explanation
+
+
+class SqlAlchemyConnectorRepository:
+    """Connector config + encrypted-credential persistence (the infra ConnectorStore, §2.1)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, tenant_id: TenantId, connector: Connector, encrypted_credentials: bytes) -> None:
+        _guard(tenant_id, connector.tenant_id)
+        self._session.add(mappers.connector_row(connector, encrypted_credentials))
+
+    def get(self, tenant_id: TenantId, connector_id: ConnectorId) -> Connector | None:
+        row = self._session.scalars(
+            select(ConnectorRow).where(
+                ConnectorRow.id == str(connector_id),
+                ConnectorRow.tenant_id == str(tenant_id),
+            )
+        ).first()
+        return mappers.to_connector(row) if row is not None else None
+
+    def list_for_tenant(self, tenant_id: TenantId) -> Sequence[Connector]:
+        rows = self._session.scalars(
+            select(ConnectorRow)
+            .where(ConnectorRow.tenant_id == str(tenant_id))
+            .order_by(ConnectorRow.id)
+        ).all()
+        return [mappers.to_connector(r) for r in rows]
+
+    def load_credentials(self, tenant_id: TenantId, connector_id: ConnectorId) -> bytes | None:
+        row = self._session.scalars(
+            select(ConnectorRow).where(
+                ConnectorRow.id == str(connector_id),
+                ConnectorRow.tenant_id == str(tenant_id),
+            )
+        ).first()
+        return row.encrypted_credentials if row is not None else None
+
+    def find_by_id(self, connector_id: ConnectorId) -> Connector | None:
+        """Resolve a connector (incl. its tenant) by id alone — the webhook-ingress
+        resolver (§6). This is the single deliberate non-tenant-prescoped read; the id is
+        the routing key and the webhook signature gates processing (§11)."""
+        row = self._session.get(ConnectorRow, str(connector_id))
+        return mappers.to_connector(row) if row is not None else None

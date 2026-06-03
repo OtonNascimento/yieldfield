@@ -105,3 +105,25 @@ def test_precision_guard_rejects_too_many_fractional_digits() -> None:
     )
     with pytest.raises(PersistenceError, match="precision"):
         mappers.plan_row(plan)
+
+
+def test_connector_row_round_trip() -> None:
+    from yieldfield.domain.billing.connector import (
+        Connector,
+        ConnectorStatus,
+        ConnectorType,
+    )
+    from yieldfield.domain.shared.ids import ConnectorId, TenantId
+    from yieldfield.infrastructure.persistence import mappers
+
+    connector = Connector(
+        id=ConnectorId("con_1"),
+        tenant_id=TenantId("tenant-1"),
+        connector_type=ConnectorType.STRIPE_BILLING,
+        status=ConnectorStatus.ACTIVE,
+    )
+    row = mappers.connector_row(connector, b"ENCRYPTED")
+    assert row.id == "con_1"
+    assert row.connector_type == "stripe_billing"
+    assert row.encrypted_credentials == b"ENCRYPTED"
+    assert mappers.to_connector(row) == connector

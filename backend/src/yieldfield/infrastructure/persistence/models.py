@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text, func
+from sqlalchemy import ForeignKey, LargeBinary, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime
@@ -38,6 +38,7 @@ class TenantRow(Base):
     invoices: Mapped[list[InvoiceRow]] = relationship(back_populates="tenant")
     reconciliations: Mapped[list[ReconciliationRow]] = relationship(back_populates="tenant")
     findings: Mapped[list[FindingRow]] = relationship(back_populates="tenant")
+    connectors: Mapped[list[ConnectorRow]] = relationship(back_populates="tenant")
 
 
 class PlanRow(Base):
@@ -153,3 +154,20 @@ class FindingRow(Base):
     lineage_model_run_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     reconciliation: Mapped[ReconciliationRow] = relationship(back_populates="findings")
     tenant: Mapped[TenantRow] = relationship(back_populates="findings")
+
+
+class ConnectorRow(Base):
+    __tablename__ = "connectors"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    connector_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_credentials: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    tenant: Mapped[TenantRow] = relationship(back_populates="connectors")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from yieldfield.domain.billing.connector import Connector, ConnectorStatus, ConnectorType
 from yieldfield.domain.billing.contract import Contract
 from yieldfield.domain.billing.invoice import Invoice, InvoiceLineItem
 from yieldfield.domain.billing.plan import Plan
@@ -18,6 +19,7 @@ from yieldfield.domain.findings.recovery_status import RecoveryStatus
 from yieldfield.domain.findings.severity import Severity
 from yieldfield.domain.reconciliation.reconciliation import Reconciliation
 from yieldfield.domain.shared.ids import (
+    ConnectorId,
     ContractId,
     FindingId,
     InvoiceId,
@@ -33,6 +35,7 @@ from yieldfield.domain.shared.time_window import TimeWindow
 from yieldfield.infrastructure.persistence.errors import PersistenceError
 from yieldfield.infrastructure.persistence.models import (
     MONEY_SCALE,
+    ConnectorRow,
     ContractRow,
     FindingRow,
     InvoiceLineItemRow,
@@ -226,4 +229,24 @@ def to_reconciliation(row: ReconciliationRow) -> Reconciliation:
         executed_at=row.executed_at,
         rule_version=row.rule_version,
         findings=tuple(to_finding(fr) for fr in row.findings),
+    )
+
+
+# ── Connector ────────────────────────────────────────────────────────────────
+def connector_row(connector: Connector, encrypted_credentials: bytes) -> ConnectorRow:
+    return ConnectorRow(
+        id=connector.id,
+        tenant_id=connector.tenant_id,
+        connector_type=connector.connector_type.value,
+        status=connector.status.value,
+        encrypted_credentials=encrypted_credentials,
+    )
+
+
+def to_connector(row: ConnectorRow) -> Connector:
+    return Connector(
+        id=ConnectorId(row.id),
+        tenant_id=TenantId(row.tenant_id),
+        connector_type=ConnectorType(row.connector_type),
+        status=ConnectorStatus(row.status),
     )
