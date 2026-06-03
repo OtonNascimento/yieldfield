@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, LargeBinary, Numeric, String, Text, func
+from sqlalchemy import CheckConstraint, ForeignKey, LargeBinary, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime
@@ -39,6 +39,7 @@ class TenantRow(Base):
     reconciliations: Mapped[list[ReconciliationRow]] = relationship(back_populates="tenant")
     findings: Mapped[list[FindingRow]] = relationship(back_populates="tenant")
     connectors: Mapped[list[ConnectorRow]] = relationship(back_populates="tenant")
+    jobs: Mapped[list[JobRow]] = relationship(back_populates="tenant")
 
 
 class PlanRow(Base):
@@ -171,3 +172,25 @@ class ConnectorRow(Base):
         _TS, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     tenant: Mapped[TenantRow] = relationship(back_populates="connectors")
+
+
+class JobRow(Base):
+    __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint("(result_type IS NULL) = (result_ref IS NULL)", name="ck_jobs_result_pair"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    job_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    celery_task_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tenant: Mapped[TenantRow] = relationship(back_populates="jobs")

@@ -18,6 +18,7 @@ def test_all_oltp_tables_present() -> None:
         "reconciliations",
         "findings",
         "connectors",
+        "jobs",
     }
 
 
@@ -30,6 +31,7 @@ def test_every_tenant_owned_table_has_an_indexed_tenant_id() -> None:
         "reconciliations",
         "findings",
         "connectors",
+        "jobs",
     ):
         table = metadata.tables[name]
         assert "tenant_id" in table.c

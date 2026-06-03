@@ -31,11 +31,13 @@ from yieldfield.domain.shared.ids import (
 from yieldfield.domain.shared.time_window import TimeWindow
 from yieldfield.infrastructure.persistence import mappers
 from yieldfield.infrastructure.persistence.errors import PersistenceError
+from yieldfield.infrastructure.persistence.job import Job, JobResultType, JobStatus, JobType
 from yieldfield.infrastructure.persistence.models import (
     ConnectorRow,
     ContractRow,
     FindingRow,
     InvoiceRow,
+    JobRow,
     PlanRow,
     ReconciliationRow,
     TenantRow,
@@ -247,3 +249,65 @@ class SqlAlchemyConnectorRepository:
         the routing key and the webhook signature gates processing (§11)."""
         row = self._session.get(ConnectorRow, str(connector_id))
         return mappers.to_connector(row) if row is not None else None
+
+
+def _job_row(job: Job) -> JobRow:
+    return JobRow(
+        id=job.id,
+        tenant_id=job.tenant_id,
+        job_type=job.job_type.value,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        error=job.error,
+        result_type=job.result_type.value if job.result_type is not None else None,
+        result_ref=job.result_ref,
+        celery_task_id=job.celery_task_id,
+    )
+
+
+def _to_job(row: JobRow) -> Job:
+    return Job(
+        id=row.id,
+        tenant_id=TenantId(row.tenant_id),
+        job_type=JobType(row.job_type),
+        status=JobStatus(row.status),
+        created_at=row.created_at,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        error=row.error,
+        result_type=JobResultType(row.result_type) if row.result_type is not None else None,
+        result_ref=row.result_ref,
+        celery_task_id=row.celery_task_id,
+    )
+
+
+class SqlAlchemyJobRepository:
+    """Durable operational job ledger (§3). Authoritative status surface for GET /jobs (3C)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, tenant_id: TenantId, job: Job) -> None:
+        _guard(tenant_id, job.tenant_id)
+        self._session.add(_job_row(job))
+
+    def get(self, tenant_id: TenantId, job_id: str) -> Job | None:
+        row = self._session.scalars(
+            select(JobRow).where(JobRow.id == job_id, JobRow.tenant_id == str(tenant_id))
+        ).first()
+        return _to_job(row) if row is not None else None
+
+    def update(self, tenant_id: TenantId, job: Job) -> None:
+        _guard(tenant_id, job.tenant_id)
+        row = self._session.get(JobRow, job.id)
+        if row is None or str(row.tenant_id) != str(tenant_id):
+            raise PersistenceError(f"Job {job.id!r} not found for tenant {tenant_id!r}.")
+        row.status = job.status.value
+        row.started_at = job.started_at
+        row.finished_at = job.finished_at
+        row.error = job.error
+        row.result_type = job.result_type.value if job.result_type is not None else None
+        row.result_ref = job.result_ref
+        row.celery_task_id = job.celery_task_id
