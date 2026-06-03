@@ -56,4 +56,5 @@ def test_migration_0002_upgrades_and_downgrades(fresh_pg_url: str) -> None:
     assert "jobs" not in tables
     recon_cols = {c["name"] for c in inspector.get_columns("reconciliations")}
     assert "executed_at" not in recon_cols
+    assert "rule_version" not in recon_cols
     engine.dispose()
