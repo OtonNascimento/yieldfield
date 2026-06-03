@@ -31,7 +31,7 @@ class Connector:
     status: ConnectorStatus = ConnectorStatus.ACTIVE
 
     def __post_init__(self) -> None:
-        if not str(self.id).strip():
+        if not self.id.strip():
             raise InvalidEntityError("Connector id is required.")
-        if not str(self.tenant_id).strip():
+        if not self.tenant_id.strip():
             raise InvalidEntityError("Connector tenant_id is required.")

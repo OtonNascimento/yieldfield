@@ -29,3 +29,12 @@ def test_connector_requires_ids() -> None:
             tenant_id=TenantId("tenant-1"),
             connector_type=ConnectorType.STRIPE_BILLING,
         )
+
+
+def test_connector_requires_tenant_id() -> None:
+    with pytest.raises(InvalidEntityError):
+        Connector(
+            id=ConnectorId("con_1"),
+            tenant_id=TenantId(""),
+            connector_type=ConnectorType.STRIPE_BILLING,
+        )
