@@ -29,5 +29,6 @@ def test_unsupported_type_raises() -> None:
     )
     # Force an unmapped value to prove the guard fires for future types.
     object.__setattr__(connector, "connector_type", "metronome")
-    with pytest.raises(ConnectorError):
+    # match= pins the message so the offending type stays in the diagnostic.
+    with pytest.raises(ConnectorError, match="metronome"):
         build_connector(connector)
