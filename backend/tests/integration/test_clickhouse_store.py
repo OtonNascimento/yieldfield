@@ -52,3 +52,22 @@ def test_query_is_tenant_isolated(clickhouse_store: Any) -> None:
     )
     ids = {e.id for e in clickhouse_store.query(TenantId("t_Y"), _WINDOW)}
     assert "ue_x" not in ids  # tenant Y never sees tenant X's events (§11)
+
+
+def test_duplicate_append_is_deduped(clickhouse_store: Any) -> None:
+    tid = TenantId("tenant-dedup")
+    event = UsageEvent(
+        id=UsageEventId("meter_x:cus_1:1714521600"),
+        tenant_id=tid,
+        customer_id="cus_1",
+        metric="api_calls",
+        quantity=Decimal("5"),
+        occurred_at=datetime(2026, 5, 1, tzinfo=UTC),
+    )
+    clickhouse_store.append(tid, [event])
+    clickhouse_store.append(tid, [event])  # same id — must collapse to one row
+
+    window = TimeWindow(datetime(2026, 4, 1, tzinfo=UTC), datetime(2026, 6, 1, tzinfo=UTC))
+    rows = list(clickhouse_store.query(tid, window))
+    assert len(rows) == 1
+    assert rows[0].quantity == Decimal("5")

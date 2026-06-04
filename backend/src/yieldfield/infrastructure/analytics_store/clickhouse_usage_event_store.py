@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS {_TABLE} (
     quantity Decimal128(12),
     occurred_at DateTime64(6, 'UTC')
 )
-ENGINE = MergeTree
+ENGINE = ReplacingMergeTree
 PARTITION BY (tenant_id, toYYYYMM(occurred_at))
 ORDER BY (tenant_id, occurred_at, id)
 """
@@ -75,7 +75,7 @@ class ClickHouseUsageEventStore:
 
     def query(self, tenant_id: TenantId, window: TimeWindow) -> Iterable[UsageEvent]:
         result = self._client.query(
-            f"SELECT {', '.join(_COLUMNS)} FROM {self._table} "  # noqa: S608
+            f"SELECT {', '.join(_COLUMNS)} FROM {self._table} FINAL "  # noqa: S608
             "WHERE tenant_id = {tid:String} "
             "AND occurred_at >= {start:DateTime64} AND occurred_at < {end:DateTime64} "
             "ORDER BY occurred_at, id",
