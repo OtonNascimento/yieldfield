@@ -22,8 +22,9 @@ from yieldfield.infrastructure.persistence.repositories import (
     SqlAlchemyTenantRepository,
 )
 
+pytestmark = pytest.mark.integration
 
-@pytest.mark.integration
+
 def test_connector_round_trip_and_find_by_id(session: Session) -> None:
     tid = TenantId("tenant-con")
     SqlAlchemyTenantRepository(session).add(Tenant(id=tid, name="Con"))
@@ -40,12 +41,11 @@ def test_connector_round_trip_and_find_by_id(session: Session) -> None:
 
     assert repo.get(tid, ConnectorId("con_1")) == connector
     assert repo.load_credentials(tid, ConnectorId("con_1")) == b"ENCRYPTED-BLOB"
-    assert [c.id for c in repo.list_for_tenant(tid)] == ["con_1"]
+    assert repo.list_for_tenant(tid) == [connector]
     # find_by_id resolves the owning tenant from the id alone (webhook ingress, §6).
     assert repo.find_by_id(ConnectorId("con_1")) == connector
 
 
-@pytest.mark.integration
 def test_connector_reads_are_tenant_isolated(session: Session) -> None:
     tenants = SqlAlchemyTenantRepository(session)
     tenants.add(Tenant(id=TenantId("t_A"), name="A"))
@@ -64,9 +64,10 @@ def test_connector_reads_are_tenant_isolated(session: Session) -> None:
     session.flush()
     assert repo.get(TenantId("t_B"), ConnectorId("con_A")) is None
     assert repo.list_for_tenant(TenantId("t_B")) == []
+    # Positive leg: the owning tenant can still read its own connector.
+    assert repo.get(TenantId("t_A"), ConnectorId("con_A")) is not None
 
 
-@pytest.mark.integration
 def test_job_lifecycle_round_trip(session: Session) -> None:
     tid = TenantId("tenant-job")
     SqlAlchemyTenantRepository(session).add(Tenant(id=tid, name="Job"))
@@ -101,5 +102,9 @@ def test_job_lifecycle_round_trip(session: Session) -> None:
     assert reloaded.status is JobStatus.SUCCEEDED
     assert reloaded.result_type is JobResultType.RECONCILIATION
     assert reloaded.result_ref == "rec_1"
+    # Lifecycle timestamps round-trip (tz-aware) through the update path.
+    assert reloaded.started_at == datetime(2026, 6, 1, 0, 0, 1, tzinfo=UTC)
+    assert reloaded.finished_at == datetime(2026, 6, 1, 0, 0, 2, tzinfo=UTC)
+
     # Tenant isolation: another tenant cannot read this job.
     assert repo.get(TenantId("other"), "job_1") is None
