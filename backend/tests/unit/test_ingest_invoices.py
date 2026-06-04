@@ -77,3 +77,31 @@ def test_empty_pull_returns_zero_and_adds_nothing() -> None:
     count = IngestInvoices(repo).run(TENANT, WINDOW, FakeConnector([]))
     assert count == 0
     assert repo.added == []
+
+
+class StreamingConnector:
+    """Yields invoices from a one-shot generator — pins single-pass consumption (no re-iteration)."""
+
+    def __init__(self, count: int) -> None:
+        self._count = count
+
+    def authenticate(self, credentials: ConnectorCredentials) -> None:
+        return None
+
+    def pull_usage_events(self, window: TimeWindow) -> Iterable[UsageEvent]:
+        return []
+
+    def pull_invoices(self, window: TimeWindow) -> Iterable[Invoice]:
+        return (_invoice(f"inv_{i}") for i in range(self._count))
+
+    def verify_webhook(self, payload: bytes, signature: str) -> bool:
+        return True
+
+
+def test_one_shot_generator_pull_is_consumed_exactly_once() -> None:
+    # A real connector may stream invoices from a lazy generator; the use-case must consume it
+    # exactly once. A second iteration would exhaust it and under-count.
+    repo = FakeInvoiceRepo()
+    count = IngestInvoices(repo).run(TENANT, WINDOW, StreamingConnector(3))
+    assert count == 3
+    assert len(repo.added) == 3
