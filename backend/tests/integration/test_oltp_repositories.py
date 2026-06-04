@@ -216,3 +216,113 @@ def test_invoice_add_is_idempotent(session: Session) -> None:
     assert stored is not None
     assert stored.total() == Money.of("250", "USD")
     assert len(stored.line_items) == 1  # line items replaced, not accumulated
+
+
+@pytest.mark.integration
+def test_reconciliation_add_is_idempotent(session: Session) -> None:
+    tid = TenantId("tenant-rc-idem")
+    SqlAlchemyTenantRepository(session).add(Tenant(id=tid, name="RcIdem"))
+    session.flush()
+
+    repo = SqlAlchemyReconciliationRepository(session)
+    findings_repo = SqlAlchemyFindingRepository(session)
+
+    def _finding(fid: str, amount: str) -> Finding:
+        return Finding(
+            id=FindingId(fid),
+            tenant_id=tid,
+            reconciliation_id=ReconciliationId("rc-idem"),
+            customer_id="cus_idem",
+            metric="api_call",
+            leakage_type=LeakageType.UNBILLED_USAGE,
+            severity=Severity.HIGH,
+            amount=Money.of(amount, "USD"),
+            status=RecoveryStatus.NEW,
+            lineage=FindingLineage(rule_version="reconciliation-v1"),
+            explanation="leakage detected.",
+        )
+
+    def _recon(findings: tuple[Finding, ...]) -> Reconciliation:
+        return Reconciliation(
+            id=ReconciliationId("rc-idem"),
+            tenant_id=tid,
+            window=_WINDOW,
+            currency="USD",
+            executed_at=datetime(2026, 3, 1, tzinfo=UTC),
+            rule_version="reconciliation-v1",
+            findings=findings,
+        )
+
+    # First add: one finding
+    repo.add(tid, _recon((_finding("fd-idem-1", "50.00"),)))
+    session.flush()
+
+    # Second add: same reconciliation id, different finding set (two findings)
+    repo.add(tid, _recon((_finding("fd-idem-2", "75.00"), _finding("fd-idem-3", "25.00"))))
+    session.flush()
+
+    # Findings should reflect ONLY the second add — no accumulation from the first
+    findings = list(findings_repo.list_for_reconciliation(tid, ReconciliationId("rc-idem")))
+    finding_ids = {f.id for f in findings}
+    assert FindingId("fd-idem-1") not in finding_ids, "first-add finding must be replaced"
+    assert FindingId("fd-idem-2") in finding_ids
+    assert FindingId("fd-idem-3") in finding_ids
+    assert len(findings) == 2  # replaced, not accumulated
+
+    # Reconciliation's own fields reflect the second version
+    stored_rc = repo.get(tid, ReconciliationId("rc-idem"))
+    assert stored_rc is not None
+    assert stored_rc.total_leakage() == Money.of("100.00", "USD")
+
+
+@pytest.mark.integration
+def test_upsert_rejects_cross_tenant_id_collision(session: Session) -> None:
+    from yieldfield.infrastructure.persistence.errors import PersistenceError
+
+    tid_a = TenantId("tenant-col-A")
+    tid_b = TenantId("tenant-col-B")
+    tenants = SqlAlchemyTenantRepository(session)
+    tenants.add(Tenant(id=tid_a, name="ColA"))
+    tenants.add(Tenant(id=tid_b, name="ColB"))
+    session.flush()
+
+    invoices = SqlAlchemyInvoiceRepository(session)
+    period = _WINDOW
+
+    inv_a = Invoice(
+        id=InvoiceId("inv-collision"),
+        tenant_id=tid_a,
+        customer_id="cus_a",
+        period=period,
+        currency="USD",
+        line_items=(
+            InvoiceLineItem(
+                id=InvoiceLineItemId("li-col-1"),
+                metric="api_calls",
+                quantity=Decimal("5"),
+                amount=Money.of("50.00", "USD"),
+            ),
+        ),
+    )
+    # Tenant A owns inv-collision
+    invoices.add(tid_a, inv_a)
+    session.flush()
+
+    # Tenant B tries to upsert with the same invoice id — second _guard must fire
+    inv_b = Invoice(
+        id=InvoiceId("inv-collision"),  # same id as A's invoice
+        tenant_id=tid_b,
+        customer_id="cus_b",
+        period=period,
+        currency="USD",
+        line_items=(
+            InvoiceLineItem(
+                id=InvoiceLineItemId("li-col-2"),
+                metric="api_calls",
+                quantity=Decimal("1"),
+                amount=Money.of("10.00", "USD"),
+            ),
+        ),
+    )
+    with pytest.raises(PersistenceError):
+        invoices.add(tid_b, inv_b)
