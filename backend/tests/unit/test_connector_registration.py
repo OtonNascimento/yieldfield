@@ -84,3 +84,16 @@ def test_build_authenticated_unknown_connector_raises() -> None:
         _service(FakeConnectorStore()).build_authenticated(
             TenantId("tenant-1"), ConnectorId("missing")
         )
+
+
+def test_build_authenticated_missing_blob_raises() -> None:
+    # A known connector whose credential blob is gone (corrupted/partial store) is a
+    # distinct ConnectorError branch from the unknown-connector case above.
+    store = FakeConnectorStore()
+    service = _service(store)
+    connector = service.register(
+        TenantId("tenant-1"), ConnectorType.STRIPE_BILLING, {"api_key": "sk_test_1"}
+    )
+    del store.blobs[str(connector.id)]
+    with pytest.raises(ConnectorError):
+        service.build_authenticated(TenantId("tenant-1"), connector.id)
