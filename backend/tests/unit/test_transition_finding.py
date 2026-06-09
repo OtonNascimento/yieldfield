@@ -73,3 +73,11 @@ def test_illegal_transition_raises_and_does_not_persist() -> None:
     with pytest.raises(InvalidFindingTransitionError):
         TransitionFinding(repo).run(TENANT, FindingId("f_1"), RecoveryStatus.CONFIRMED)
     assert repo.updated == []
+
+
+def test_terminal_finding_cannot_transition_and_does_not_persist() -> None:
+    repo = FakeFindingRepo(_finding(RecoveryStatus.RECOVERED))
+    # RECOVERED is terminal — no transition is legal, so nothing is persisted.
+    with pytest.raises(InvalidFindingTransitionError):
+        TransitionFinding(repo).run(TENANT, FindingId("f_1"), RecoveryStatus.DISMISSED)
+    assert repo.updated == []
