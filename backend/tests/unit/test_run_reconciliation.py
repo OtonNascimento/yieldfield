@@ -323,6 +323,22 @@ def test_empty_window_persists_an_empty_usd_run() -> None:
     assert repo.saved == [result]
 
 
+def test_customer_with_unresolvable_plan_is_skipped_and_run_still_persists() -> None:
+    # The contract points at a plan id the repo cannot resolve → no pricing for the
+    # customer → skipped (unpriced usage is future work), and an empty run is persisted.
+    repo = FakeReconRepo()
+    service = _service(
+        invoices=[_invoice("inv_1", "cus_1")],
+        events=[_event("u_1", "cus_1", "api_calls", "100", datetime(2026, 1, 15, tzinfo=UTC))],
+        contracts=[_contract("con_1", "cus_1", "p_missing")],
+        plans=[],  # p_missing does not resolve
+        recon_repo=repo,
+    )
+    result = service.run(TENANT, WINDOW, RECON)
+    assert result.finding_count == 0
+    assert repo.saved == [result]
+
+
 def test_rerun_with_same_id_produces_the_same_financial_result() -> None:
     # Convergence at the financial level: same inputs + same reconciliation_id ⇒ same findings/total.
     # (Storage-level idempotency on reconciliation_id is the repository's job, integration-tested in 3A.)

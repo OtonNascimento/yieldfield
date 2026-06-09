@@ -83,6 +83,9 @@ class RunReconciliation:
             if not plans_by_metric:
                 continue  # no known pricing for this customer — skip (unpriced usage is future work)
             customer_usage = usage_by_customer.get(customer_id, [])
+            # Precondition: a customer's invoice periods do not overlap (true for Stripe billing
+            # periods). An event is attributed to every invoice whose period contains it, so
+            # overlapping periods would double-count the same usage across invoices.
             for invoice in customer_invoices:
                 events_in_period = [
                     event for event in customer_usage if invoice.period.contains(event.occurred_at)
