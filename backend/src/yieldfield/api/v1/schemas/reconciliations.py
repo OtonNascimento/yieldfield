@@ -31,6 +31,8 @@ class ReconciliationRead(BaseModel):
             currency=reconciliation.currency,
             executed_at=reconciliation.executed_at,
             rule_version=reconciliation.rule_version,
+            # Zero-leakage runs serialize as "0" (str(Decimal(0))); decimal-scale
+            # normalization is a display concern, deferred to the frontend (§5A).
             total_leakage=MoneyRead.from_money(reconciliation.total_leakage()),
             finding_count=reconciliation.finding_count,
         )

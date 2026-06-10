@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -42,6 +42,13 @@ def test_window_param_rejects_end_before_start() -> None:
         WindowParam(start=datetime(2026, 2, 1, tzinfo=UTC), end=datetime(2026, 1, 1, tzinfo=UTC))
 
 
+def test_window_param_allows_equal_start_and_end() -> None:
+    # Degenerate-but-valid half-open window [t, t) — matches domain TimeWindow semantics.
+    moment = datetime(2026, 1, 1, tzinfo=UTC)
+    param = WindowParam(start=moment, end=moment)
+    assert param.to_window().duration == timedelta(0)
+
+
 def test_window_param_round_trips_to_domain_window() -> None:
     param = WindowParam(
         start=datetime(2026, 1, 1, tzinfo=UTC), end=datetime(2026, 2, 1, tzinfo=UTC)
@@ -60,6 +67,10 @@ def test_connector_public_never_carries_secrets() -> None:
     )
     public = ConnectorPublic.from_connector(connector)
     assert set(public.model_dump()) == {"id", "connector_type", "status"}  # no secrets field
+    # JSON mode pins the wire shape the Slice-4 client generates against: plain strings.
+    dumped = public.model_dump(mode="json")
+    assert dumped["connector_type"] == "stripe_billing"
+    assert type(dumped["connector_type"]) is str
 
 
 def test_finding_and_reconciliation_reads_expose_dollars_and_explanations() -> None:
@@ -89,6 +100,9 @@ def test_finding_and_reconciliation_reads_expose_dollars_and_explanations() -> N
     assert fr.amount.amount == "10.00"
     assert fr.explanation == "100 api_calls were not billed."
     assert "lineage" not in fr.model_dump()  # internal lineage stays internal (§5.3)
+    dumped = fr.model_dump(mode="json")
+    assert dumped["leakage_type"] == "unbilled_usage"
+    assert dumped["status"] == "new"
     rr = ReconciliationRead.from_reconciliation(recon)
     assert rr.total_leakage.amount == "10.00"
     assert rr.finding_count == 1
