@@ -25,6 +25,8 @@ def current_tenant(
     if not authorization or not authorization.startswith(_BEARER_PREFIX):
         raise UnauthorizedError("Missing or invalid bearer token.")
     token = authorization.removeprefix(_BEARER_PREFIX).strip()
+    if not token:
+        raise UnauthorizedError("Missing or invalid bearer token.")
     tenant_id = settings.api_tokens.get(token)
     if tenant_id is None:
         raise UnauthorizedError("Missing or invalid bearer token.")
