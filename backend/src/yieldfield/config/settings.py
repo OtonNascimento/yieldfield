@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     api_tokens: dict[str, str] = Field(default_factory=dict)
     # Feature flag gating live billing-platform pulls (DoD: risky work behind a flag).
     ingestion_enabled: bool = False
+    # Optional base-URL override for billing-platform connectors (stripe-mock in tests/CI;
+    # unset in production so connectors hit the real platform) (§16, §17).
+    connector_base_url: str | None = None
 
     @property
     def celery_broker_url(self) -> str:

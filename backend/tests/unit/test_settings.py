@@ -44,3 +44,8 @@ def test_slice3_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.ingestion_enabled is True
     assert settings.api_tokens == {"tok_abc": "tenant-1"}
     assert settings.credentials_key == "test-key"
+
+
+def test_connector_base_url_defaults_to_none() -> None:
+    settings = Settings(_env_file=None)
+    assert settings.connector_base_url is None
