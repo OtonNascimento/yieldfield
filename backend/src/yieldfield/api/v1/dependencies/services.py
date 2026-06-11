@@ -11,8 +11,10 @@ from fastapi import Depends
 
 from yieldfield.api.v1.dependencies.database import DbSession
 from yieldfield.api.v1.dependencies.settings import SettingsDep
+from yieldfield.api.v1.schemas.jobs import JobStatusRead
 from yieldfield.config.settings import Settings
 from yieldfield.infrastructure.connectors.registration import ConnectorRegistrationService
+from yieldfield.infrastructure.persistence.job import Job
 from yieldfield.infrastructure.persistence.repositories import (
     SqlAlchemyConnectorRepository,
     SqlAlchemyFindingRepository,
@@ -66,3 +68,18 @@ ReconciliationRepo = Annotated[
     SqlAlchemyReconciliationRepository, Depends(get_reconciliation_repository)
 ]
 RegistrationDep = Annotated[ConnectorRegistrationService, Depends(get_registration_service)]
+
+
+def job_status_read(job: Job) -> JobStatusRead:
+    """Map the infrastructure Job onto the DTO here so routers never import infrastructure."""
+    return JobStatusRead(
+        job_id=job.id,
+        job_type=job.job_type.value,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        error=job.error,
+        result_type=job.result_type.value if job.result_type is not None else None,
+        result_ref=job.result_ref,
+    )
