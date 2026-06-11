@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from yieldfield.api.errors.handlers import register_error_handlers
-from yieldfield.api.v1.routers import health, jobs
+from yieldfield.api.v1.routers import connectors, health, jobs
 from yieldfield.config.logging import configure_logging, get_logger
 from yieldfield.config.settings import Settings, get_settings
 
@@ -45,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_V1_PREFIX)
     app.include_router(jobs.router, prefix=API_V1_PREFIX)
+    app.include_router(connectors.router, prefix=API_V1_PREFIX)
 
     log.info("api.started", environment=settings.environment, version=app.version)
     return app
