@@ -72,6 +72,59 @@ def test_missing_job_is_404_enveloped() -> None:
     assert response.json()["error"]["code"] == "not_found"
 
 
+def test_job_belonging_to_other_tenant_is_404() -> None:
+    # Tenant isolation at the API boundary: a foreign tenant's job must be invisible —
+    # same envelope as a missing job, so existence never leaks (§11).
+    foreign = Job(
+        id="job_1",
+        tenant_id=TenantId("tenant-99"),
+        job_type=JobType.RUN_RECONCILIATION,
+        status=JobStatus.SUCCEEDED,
+        created_at=datetime(2026, 6, 1, tzinfo=UTC),
+    )
+    client = TestClient(_app(foreign))
+    response = client.get("/api/v1/jobs/job_1", headers=AUTH)  # AUTH maps to tenant-1
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_pending_job_returns_null_optionals() -> None:
+    pending = Job(
+        id="job_1",
+        tenant_id=TenantId("tenant-1"),
+        job_type=JobType.RUN_RECONCILIATION,
+        status=JobStatus.PENDING,
+        created_at=datetime(2026, 6, 1, tzinfo=UTC),
+    )
+    client = TestClient(_app(pending))
+    response = client.get("/api/v1/jobs/job_1", headers=AUTH)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "pending"
+    for field in ("started_at", "finished_at", "error", "result_type", "result_ref"):
+        assert body[field] is None
+
+
+def test_failed_job_surfaces_error_and_no_result() -> None:
+    failed = Job(
+        id="job_1",
+        tenant_id=TenantId("tenant-1"),
+        job_type=JobType.RUN_RECONCILIATION,
+        status=JobStatus.FAILED,
+        created_at=datetime(2026, 6, 1, tzinfo=UTC),
+        started_at=datetime(2026, 6, 1, 0, 0, 1, tzinfo=UTC),
+        finished_at=datetime(2026, 6, 1, 0, 0, 2, tzinfo=UTC),
+        error="Reconciliation failed: currency mismatch.",
+    )
+    client = TestClient(_app(failed))
+    response = client.get("/api/v1/jobs/job_1", headers=AUTH)
+    assert response.status_code == 200  # FAILED is a poll result, not an HTTP error (§3)
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["error"] == "Reconciliation failed: currency mismatch."
+    assert body["result_type"] is None and body["result_ref"] is None
+
+
 def test_jobs_require_bearer_auth() -> None:
     client = TestClient(_app(_job()))
     assert client.get("/api/v1/jobs/job_1").status_code == 401

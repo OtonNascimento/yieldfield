@@ -48,8 +48,10 @@ class FakeRegistration:
 class FakeStore:
     def __init__(self, connectors: Sequence[Connector]) -> None:
         self._connectors = connectors
+        self.calls: list[TenantId] = []
 
     def list_for_tenant(self, tenant_id: TenantId) -> Sequence[Connector]:
+        self.calls.append(tenant_id)
         return list(self._connectors)
 
 
@@ -116,3 +118,33 @@ def test_unknown_connector_type_is_422() -> None:
 def test_connectors_require_bearer_auth() -> None:
     client = TestClient(_app(FakeRegistration()))
     assert client.get("/api/v1/connectors").status_code == 401
+
+
+def test_register_requires_bearer_auth() -> None:
+    # POST carries secrets, so its auth gate gets its own pin (not just the GET's).
+    client = TestClient(_app(FakeRegistration()))
+    response = client.post(
+        "/api/v1/connectors",
+        json={"connector_type": "stripe_billing", "secrets": {"api_key": "sk_test_1"}},
+    )
+    assert response.status_code == 401
+
+
+def test_list_scopes_query_to_token_tenant() -> None:
+    store = FakeStore([])
+    client = TestClient(_app(FakeRegistration(), store))
+    assert client.get("/api/v1/connectors", headers=AUTH).status_code == 200
+    assert store.calls == [TenantId("tenant-1")]  # tenant from the token, never the query
+
+
+def test_type_invalid_secret_is_422_and_never_echoed() -> None:
+    client = TestClient(_app(FakeRegistration()))
+    response = client.post(
+        "/api/v1/connectors",
+        headers=AUTH,
+        json={"connector_type": "stripe_billing", "secrets": {"api_key": 123456789}},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    # The submitted value must not round-trip in the validation details (§11).
+    assert "123456789" not in response.text

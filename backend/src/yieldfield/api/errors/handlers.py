@@ -68,7 +68,12 @@ async def _validation_exception_handler(_: Request, exc: Exception) -> JSONRespo
         code="validation_error",
         message="Request validation failed.",
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        details=[dict(error) for error in validation_exc.errors()],
+        # type/loc/msg only — the raw errors() echo the submitted `input`, and a
+        # type-invalid secret value must never round-trip in a response body (§11).
+        details=[
+            {"type": error["type"], "loc": list(error["loc"]), "msg": error["msg"]}
+            for error in validation_exc.errors()
+        ],
     )
 
 
