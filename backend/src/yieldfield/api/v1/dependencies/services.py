@@ -111,6 +111,11 @@ class JobSubmitter:
     The commit-before-enqueue ordering is load-bearing: with `task_acks_late` a fast worker
     can pick the task up immediately, and `run_as_job` must find the Job row. Worker args
     convention: (job_id, tenant_id, *task_args), all strings (JSON-serializable).
+
+    The broker task id is deliberately not captured here: the worker records its own
+    `self.request.id` when `run_as_job` marks the Job RUNNING (§3). If enqueue fails after
+    the commit, the row stays durably PENDING (visible via GET /jobs/{id}) with no worker
+    behind it; sweeping such orphans is out of scope this slice.
     """
 
     session: Session

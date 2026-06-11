@@ -72,7 +72,8 @@ def test_ingest_usage_events_returns_202() -> None:
 
 @pytest.mark.parametrize("path", ["invoices", "usage-events"])
 def test_ingestion_is_403_when_flag_is_off(path: str) -> None:
-    client = TestClient(_app(FakeSubmitter(), enabled=False))
+    submitter = FakeSubmitter()
+    client = TestClient(_app(submitter, enabled=False))
     response = client.post(
         f"/api/v1/ingestion/{path}",
         headers=AUTH,
@@ -80,6 +81,23 @@ def test_ingestion_is_403_when_flag_is_off(path: str) -> None:
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "ingestion_disabled"
+    assert submitter.submitted == []  # disabled means zero side effects: no job, no enqueue
+
+
+def test_naive_window_is_422_enveloped_and_never_submits() -> None:
+    submitter = FakeSubmitter()
+    client = TestClient(_app(submitter))
+    response = client.post(
+        "/api/v1/ingestion/invoices",
+        headers=AUTH,
+        json={
+            "connector_id": "con_1",
+            "window": {"start": "2026-01-01T00:00:00", "end": "2026-02-01T00:00:00+00:00"},
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    assert submitter.submitted == []
 
 
 def test_ingestion_requires_bearer_auth() -> None:
