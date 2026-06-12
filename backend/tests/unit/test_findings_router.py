@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 
 import pytest
 from fastapi import FastAPI
@@ -48,12 +49,18 @@ class FakeFindingRepo:
         self.updated: list[Finding] = []
 
     def get(self, tenant_id: TenantId, finding_id: FindingId) -> Finding | None:
-        return self._findings.get(str(finding_id))
+        # Tenant-aware like the real repository, so tests pin tenant forwarding (§11).
+        finding = self._findings.get(str(finding_id))
+        return finding if finding is not None and finding.tenant_id == tenant_id else None
 
     def list_for_reconciliation(
         self, tenant_id: TenantId, reconciliation_id: ReconciliationId
     ) -> Sequence[Finding]:
-        return [f for f in self._findings.values() if f.reconciliation_id == reconciliation_id]
+        return [
+            f
+            for f in self._findings.values()
+            if f.tenant_id == tenant_id and f.reconciliation_id == reconciliation_id
+        ]
 
     def update(self, tenant_id: TenantId, finding: Finding) -> None:
         self.updated.append(finding)
@@ -95,6 +102,26 @@ def test_get_missing_finding_is_404() -> None:
     response = client.get("/api/v1/findings/nope", headers=AUTH)
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_finding_belonging_to_other_tenant_is_404() -> None:
+    # Tenant isolation at the API boundary: foreign findings are invisible — same
+    # envelope as a missing finding, so existence never leaks (§11).
+    foreign = replace(_finding(), tenant_id=TenantId("tenant-99"))
+    client = TestClient(_app(FakeFindingRepo([foreign])))
+    response = client.get("/api/v1/findings/f_1", headers=AUTH)  # AUTH maps to tenant-1
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_transition_on_foreign_tenant_finding_is_404_and_not_persisted() -> None:
+    foreign = replace(_finding(status=RecoveryStatus.NEW), tenant_id=TenantId("tenant-99"))
+    repo = FakeFindingRepo([foreign])
+    client = TestClient(_app(repo))
+    response = client.post("/api/v1/findings/f_1/review", headers=AUTH)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert repo.updated == []
 
 
 @pytest.mark.parametrize(
