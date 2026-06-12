@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from yieldfield.api.errors.handlers import register_error_handlers
 from yieldfield.api.v1.routers import connectors, findings, health, ingestion, jobs, reconciliations
+from yieldfield.api.webhooks.router import router as webhooks_router
 from yieldfield.config.logging import configure_logging, get_logger
 from yieldfield.config.settings import Settings, get_settings
 
@@ -49,6 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ingestion.router, prefix=API_V1_PREFIX)
     app.include_router(reconciliations.router, prefix=API_V1_PREFIX)
     app.include_router(findings.router, prefix=API_V1_PREFIX)
+    app.include_router(webhooks_router, prefix=API_V1_PREFIX)
 
     log.info("api.started", environment=settings.environment, version=app.version)
     return app
