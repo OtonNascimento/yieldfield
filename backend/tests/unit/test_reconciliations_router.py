@@ -80,7 +80,8 @@ def test_post_returns_202_and_pre_generates_the_reconciliation_id() -> None:
     response = client.post("/api/v1/reconciliations", headers=AUTH, json={"window": WINDOW_JSON})
     assert response.status_code == 202
     assert response.json() == {"job_id": "job_x"}
-    _tenant, task_name, args = submitter.submitted[0]
+    tenant, task_name, args = submitter.submitted[0]
+    assert tenant == TenantId("tenant-1")  # tenant from the token, never the body
     assert task_name == RUN_RECONCILIATION_TASK
     assert args[0] == "2026-01-01T00:00:00+00:00"
     assert args[2].startswith("rec_")  # pre-generated so worker retries converge (decision C/E)
