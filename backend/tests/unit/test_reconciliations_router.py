@@ -29,10 +29,10 @@ def _settings() -> Settings:
     return Settings(_env_file=None, api_tokens={"tok-1": "tenant-1"})
 
 
-def _recon(recon_id: str, executed_at: datetime) -> Reconciliation:
+def _recon(recon_id: str, executed_at: datetime, tenant: str = "tenant-1") -> Reconciliation:
     return Reconciliation(
         id=ReconciliationId(recon_id),
-        tenant_id=TenantId("tenant-1"),
+        tenant_id=TenantId(tenant),
         window=WINDOW,
         currency="USD",
         executed_at=executed_at,
@@ -51,6 +51,8 @@ class FakeSubmitter:
 
 
 class FakeReconRepo:
+    """Tenant-aware like the real repository, so cross-tenant 404s are pinned here (§11)."""
+
     def __init__(self, reconciliations: Sequence[Reconciliation]) -> None:
         self._reconciliations = list(reconciliations)
 
@@ -58,12 +60,12 @@ class FakeReconRepo:
         self, tenant_id: TenantId, reconciliation_id: ReconciliationId
     ) -> Reconciliation | None:
         for r in self._reconciliations:
-            if r.id == reconciliation_id:
+            if r.id == reconciliation_id and r.tenant_id == tenant_id:
                 return r
         return None
 
     def list_for_tenant(self, tenant_id: TenantId) -> Sequence[Reconciliation]:
-        return list(self._reconciliations)
+        return [r for r in self._reconciliations if r.tenant_id == tenant_id]
 
 
 def _app(submitter: FakeSubmitter, repo: FakeReconRepo | None = None) -> FastAPI:
@@ -103,6 +105,28 @@ def test_get_missing_is_404() -> None:
     response = client.get("/api/v1/reconciliations/nope", headers=AUTH)
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_reconciliation_belonging_to_other_tenant_is_404() -> None:
+    # The financial audit trail must never resolve across tenants (§11): a foreign run
+    # reads exactly like a missing one.
+    repo = FakeReconRepo([_recon("rec_foreign", datetime(2026, 3, 1, tzinfo=UTC), "tenant-2")])
+    client = TestClient(_app(FakeSubmitter(), repo))
+    response = client.get("/api/v1/reconciliations/rec_foreign", headers=AUTH)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_list_excludes_other_tenants_runs() -> None:
+    repo = FakeReconRepo(
+        [
+            _recon("rec_mine", datetime(2026, 3, 1, tzinfo=UTC)),
+            _recon("rec_foreign", datetime(2026, 3, 2, tzinfo=UTC), "tenant-2"),
+        ]
+    )
+    client = TestClient(_app(FakeSubmitter(), repo))
+    body = client.get("/api/v1/reconciliations", headers=AUTH).json()
+    assert [r["id"] for r in body["items"]] == ["rec_mine"]
 
 
 def test_list_is_newest_first_and_paginated() -> None:
