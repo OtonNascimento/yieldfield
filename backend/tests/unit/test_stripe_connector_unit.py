@@ -57,3 +57,13 @@ def test_verify_webhook_rejects_a_stale_timestamp() -> None:
     payload = b'{"id":"evt_1","object":"event"}'
     header = _sign(payload, _SECRET, int(time.time()) - 10_000)  # outside tolerance
     assert _authed().verify_webhook(payload, header) is False
+
+
+def test_verify_webhook_fails_closed_when_no_webhook_secret_is_configured() -> None:
+    # webhook_secret is an OPTIONAL credential (§17); a connector registered without one
+    # must never accept a webhook — raising beats silently returning True (§11).
+    c = StripeBillingConnector(TenantId("t_1"))
+    c.authenticate(ConnectorCredentials(secrets={"api_key": "sk_test_x"}))
+    payload = b'{"id":"evt_1","object":"event"}'
+    with pytest.raises(ConnectorAuthError):
+        c.verify_webhook(payload, _sign(payload, _SECRET, int(time.time())))

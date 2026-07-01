@@ -22,6 +22,7 @@ from yieldfield.domain.billing.invoice import Invoice
 from yieldfield.domain.billing.usage_event import UsageEvent
 from yieldfield.domain.shared.ids import ConnectorId, TenantId
 from yieldfield.domain.shared.time_window import TimeWindow
+from yieldfield.infrastructure.connectors.base.connector import ConnectorAuthError
 
 
 def _settings() -> Settings:
@@ -135,6 +136,30 @@ def test_missing_signature_header_is_400() -> None:
     )
     response = client.post("/api/v1/webhooks/con_1", content=b"{}")
     assert response.status_code == 400
+
+
+class SecretlessLiveConnector(FakeLiveConnector):
+    """A connector registered without the optional webhook_secret (§17) fails closed."""
+
+    def verify_webhook(self, payload: bytes, signature: str) -> bool:
+        raise ConnectorAuthError("Webhook secret not configured; call authenticate() first.")
+
+
+def test_connector_without_webhook_secret_fails_closed_with_400_and_enqueues_nothing() -> None:
+    submitter = FakeSubmitter()
+    client = TestClient(
+        _app(
+            FakeStore(_connector()),
+            FakeRegistration(SecretlessLiveConnector(valid=True)),
+            submitter,
+        )
+    )
+    response = client.post(
+        "/api/v1/webhooks/con_1", content=b"{}", headers={"Stripe-Signature": "t=1,v1=abc"}
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "connector_auth_error"
+    assert submitter.submitted == []
 
 
 def test_unknown_connector_id_is_404() -> None:
