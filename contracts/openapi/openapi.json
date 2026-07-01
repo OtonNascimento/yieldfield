@@ -1,0 +1,1540 @@
+{
+  "components": {
+    "schemas": {
+      "ConnectorCreate": {
+        "properties": {
+          "connector_type": {
+            "$ref": "#/components/schemas/ConnectorType"
+          },
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Secrets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "connector_type",
+          "secrets"
+        ],
+        "title": "ConnectorCreate",
+        "type": "object"
+      },
+      "ConnectorPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorPublic"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "ConnectorPage",
+        "type": "object"
+      },
+      "ConnectorPublic": {
+        "description": "The only connector shape the API returns \u2014 id/type/status, no credentials (\u00a711).",
+        "properties": {
+          "connector_type": {
+            "$ref": "#/components/schemas/ConnectorType"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConnectorStatus"
+          }
+        },
+        "required": [
+          "id",
+          "connector_type",
+          "status"
+        ],
+        "title": "ConnectorPublic",
+        "type": "object"
+      },
+      "ConnectorStatus": {
+        "enum": [
+          "active",
+          "disabled"
+        ],
+        "title": "ConnectorStatus",
+        "type": "string"
+      },
+      "ConnectorType": {
+        "enum": [
+          "stripe_billing"
+        ],
+        "title": "ConnectorType",
+        "type": "string"
+      },
+      "FindingPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FindingRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "FindingPage",
+        "type": "object"
+      },
+      "FindingRead": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/MoneyRead"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "leakage_type": {
+            "$ref": "#/components/schemas/LeakageType"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "reconciliation_id": {
+            "title": "Reconciliation Id",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecoveryStatus"
+          }
+        },
+        "required": [
+          "id",
+          "reconciliation_id",
+          "customer_id",
+          "metric",
+          "leakage_type",
+          "severity",
+          "status",
+          "amount",
+          "explanation"
+        ],
+        "title": "FindingRead",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthStatus": {
+        "description": "Shallow liveness payload.",
+        "properties": {
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "environment"
+        ],
+        "title": "HealthStatus",
+        "type": "object"
+      },
+      "IngestionRequest": {
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/WindowParam"
+          }
+        },
+        "required": [
+          "connector_id",
+          "window"
+        ],
+        "title": "IngestionRequest",
+        "type": "object"
+      },
+      "JobAccepted": {
+        "description": "The 202 handle every async POST returns (spec \u00a73).",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "JobAccepted",
+        "type": "object"
+      },
+      "JobStatusRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "title": "Job Type",
+            "type": "string"
+          },
+          "result_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Ref"
+          },
+          "result_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Type"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "status",
+          "created_at"
+        ],
+        "title": "JobStatusRead",
+        "type": "object"
+      },
+      "LeakageType": {
+        "enum": [
+          "unbilled_usage",
+          "misrated_line_item",
+          "unaudited_adjustment"
+        ],
+        "title": "LeakageType",
+        "type": "string"
+      },
+      "MoneyRead": {
+        "description": "Money over JSON: a decimal STRING amount \u2014 floats never touch money (\u00a77).",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "MoneyRead",
+        "type": "object"
+      },
+      "PageMeta": {
+        "description": "Opaque-cursor pagination metadata (\u00a710). `next_cursor=None` means last page.",
+        "properties": {
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "title": "PageMeta",
+        "type": "object"
+      },
+      "ReadyStatus": {
+        "description": "Readiness payload: overall status + per-dependency connectivity (\u00a711).",
+        "properties": {
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "object"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "environment",
+          "checks"
+        ],
+        "title": "ReadyStatus",
+        "type": "object"
+      },
+      "ReconciliationCreate": {
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/WindowParam"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "title": "ReconciliationCreate",
+        "type": "object"
+      },
+      "ReconciliationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "ReconciliationPage",
+        "type": "object"
+      },
+      "ReconciliationRead": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "executed_at": {
+            "format": "date-time",
+            "title": "Executed At",
+            "type": "string"
+          },
+          "finding_count": {
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "string"
+          },
+          "total_leakage": {
+            "$ref": "#/components/schemas/MoneyRead"
+          },
+          "window": {
+            "$ref": "#/components/schemas/WindowRead"
+          }
+        },
+        "required": [
+          "id",
+          "window",
+          "currency",
+          "executed_at",
+          "rule_version",
+          "total_leakage",
+          "finding_count"
+        ],
+        "title": "ReconciliationRead",
+        "type": "object"
+      },
+      "RecoveryStatus": {
+        "enum": [
+          "new",
+          "reviewed",
+          "confirmed",
+          "recovered",
+          "dismissed"
+        ],
+        "title": "RecoveryStatus",
+        "type": "string"
+      },
+      "Severity": {
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "good"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WindowParam": {
+        "description": "Inbound window: validated at the boundary (422) before touching the domain.",
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "WindowParam",
+        "type": "object"
+      },
+      "WindowRead": {
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "WindowRead",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Yieldfield API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/connectors": {
+      "get": {
+        "operationId": "list_connectors_api_v1_connectors_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List the tenant's connectors",
+        "tags": [
+          "connectors"
+        ]
+      },
+      "post": {
+        "operationId": "register_connector_api_v1_connectors_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorPublic"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register a billing-platform connector",
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/findings": {
+      "get": {
+        "operationId": "list_findings_api_v1_findings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "reconciliation_id",
+            "required": true,
+            "schema": {
+              "title": "Reconciliation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List findings for a reconciliation run",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}": {
+      "get": {
+        "operationId": "get_finding_api_v1_findings__finding_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read one finding",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}/confirm": {
+      "post": {
+        "operationId": "confirm_api_v1_findings__finding_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm leakage",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_api_v1_findings__finding_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss finding",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}/recover": {
+      "post": {
+        "operationId": "recover_api_v1_findings__finding_id__recover_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark dollars recovered",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}/review": {
+      "post": {
+        "operationId": "review_api_v1_findings__finding_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark reviewed",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/ingestion/invoices": {
+      "post": {
+        "operationId": "ingest_invoices_api_v1_ingestion_invoices_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trigger invoice ingestion",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingestion/usage-events": {
+      "post": {
+        "operationId": "ingest_usage_events_api_v1_ingestion_usage_events_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trigger usage-event ingestion",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll an async job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "operationId": "ready_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/reconciliations": {
+      "get": {
+        "operationId": "list_reconciliations_api_v1_reconciliations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List reconciliation runs (newest first)",
+        "tags": [
+          "reconciliations"
+        ]
+      },
+      "post": {
+        "operationId": "run_reconciliation_api_v1_reconciliations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run reconciliation for a window",
+        "tags": [
+          "reconciliations"
+        ]
+      }
+    },
+    "/api/v1/reconciliations/{reconciliation_id}": {
+      "get": {
+        "operationId": "get_reconciliation_api_v1_reconciliations__reconciliation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reconciliation_id",
+            "required": true,
+            "schema": {
+              "title": "Reconciliation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read one reconciliation run",
+        "tags": [
+          "reconciliations"
+        ]
+      }
+    },
+    "/api/v1/webhooks/{connector_id}": {
+      "post": {
+        "operationId": "receive_webhook_api_v1_webhooks__connector_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Stripe-Signature",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Stripe-Signature",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receive a signed provider webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    }
+  }
+}

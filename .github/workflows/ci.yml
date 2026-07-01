@@ -101,9 +101,19 @@ jobs:
   contract:
     name: contract (OpenAPI drift)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: OpenAPI contract check
-        # Becomes a real schema-drift check in Slice 3, when the backend emits
-        # contracts/openapi/openapi.json and the client is generated from it (§10).
-        run: echo "Contract check activates in Slice 3 (no API surface emitted yet)."
+
+      - name: Install uv (also provisions Python 3.12)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: "OpenAPI contract check (drift fails the build, §10)"
+        run: uv run python ../ops/scripts/export_openapi.py --check
