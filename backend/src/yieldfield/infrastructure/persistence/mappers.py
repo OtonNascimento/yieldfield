@@ -52,10 +52,17 @@ def _storable(value: Decimal, field: str) -> Decimal:
     if not isinstance(exponent, int):
         raise PersistenceError(f"{field}={value!r} is not a finite decimal.")
     if -exponent > MONEY_SCALE:
-        raise PersistenceError(
-            f"{field}={value} has more than {MONEY_SCALE} fractional digits and cannot be "
-            f"stored without precision loss (§7)."
-        )
+        # Fixed-scale sources pad with trailing zeros (ClickHouse Decimal(38,24) quantities
+        # flow into money arithmetic); zeros carry no precision, so store the reduced form.
+        # Only significant digits beyond the column scale are actual loss.
+        reduced = value.normalize()
+        reduced_exponent = reduced.as_tuple().exponent
+        if not isinstance(reduced_exponent, int) or -reduced_exponent > MONEY_SCALE:
+            raise PersistenceError(
+                f"{field}={value} has more than {MONEY_SCALE} significant fractional digits "
+                f"and cannot be stored without precision loss (§7)."
+            )
+        return reduced
     return value
 
 

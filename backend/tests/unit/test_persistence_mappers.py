@@ -107,6 +107,19 @@ def test_precision_guard_rejects_too_many_fractional_digits() -> None:
         mappers.plan_row(plan)
 
 
+def test_precision_guard_accepts_zero_padded_scale_artifacts() -> None:
+    # Fixed-scale sources (ClickHouse Decimal(38,24)) pad values with trailing zeros;
+    # storing the equal value at NUMERIC(38,12) loses nothing, so it must not raise (§7).
+    plan = Plan(
+        id=PlanId("pl_3"),
+        tenant_id=TenantId("t_1"),
+        name="zero padded",
+        metric="m",
+        unit_price=Money(Decimal("10.000000000000000000000000"), "USD"),
+    )
+    assert mappers.plan_row(plan).unit_price_amount == Decimal("10")
+
+
 def test_connector_row_round_trip() -> None:
     from yieldfield.domain.billing.connector import (
         Connector,
