@@ -49,3 +49,56 @@ def test_slice3_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_connector_base_url_defaults_to_none() -> None:
     settings = Settings(_env_file=None)
     assert settings.connector_base_url is None
+
+
+def test_production_boot_fails_fast_listing_every_missing_key() -> None:
+    # Misconfiguration must fail at BOOT, not on the first request (§16, audit PR-1).
+    with pytest.raises(ValueError, match="Production misconfiguration") as excinfo:
+        Settings(_env_file=None, environment="production")
+    message = str(excinfo.value)
+    for key in (
+        "YIELDFIELD_DATABASE_URL",
+        "YIELDFIELD_CLICKHOUSE_URL",
+        "YIELDFIELD_CREDENTIALS_KEY",
+        "YIELDFIELD_API_TOKENS",
+        "YIELDFIELD_LOG_JSON=true",
+    ):
+        assert key in message
+
+
+def test_fully_configured_production_boots() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        database_url="postgresql://u:p@db:5432/yieldfield",
+        clickhouse_url="http://u:p@ch:8123/yieldfield",
+        credentials_key="some-fernet-key",
+        api_tokens={"tok": "tenant-1"},
+        log_json=True,
+    )
+    assert settings.is_production is True
+
+
+def test_production_rejects_debug_and_connector_base_url() -> None:
+    # debug=True leaks tracebacks; connector_base_url must never redirect live pulls (§16).
+    with pytest.raises(ValueError, match="Production misconfiguration") as excinfo:
+        Settings(
+            _env_file=None,
+            environment="production",
+            database_url="postgresql://u:p@db:5432/yieldfield",
+            clickhouse_url="http://u:p@ch:8123/yieldfield",
+            credentials_key="some-fernet-key",
+            api_tokens={"tok": "tenant-1"},
+            log_json=True,
+            debug=True,
+            connector_base_url="http://mock",
+        )
+    message = str(excinfo.value)
+    assert "YIELDFIELD_DEBUG=false" in message
+    assert "YIELDFIELD_CONNECTOR_BASE_URL unset" in message
+
+
+def test_non_production_environments_keep_permissive_defaults() -> None:
+    for environment in ("local", "ci", "staging"):
+        settings = Settings(_env_file=None, environment=environment)
+        assert settings.database_url is None  # no boot-time requirement outside production

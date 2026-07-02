@@ -14,7 +14,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "ci", "staging", "production"]
@@ -79,6 +79,29 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @model_validator(mode="after")
+    def _production_invariants(self) -> Settings:
+        """Fail at boot, not on the first request, when production is misconfigured (§16).
+
+        Datastores/auth/cipher are optional in local/CI (no I/O required to import the
+        app); in production their absence is a deploy error and must stop the boot.
+        """
+        if self.environment != "production":
+            return self
+        checks: list[tuple[str, bool]] = [
+            ("YIELDFIELD_DATABASE_URL", bool(self.database_url)),
+            ("YIELDFIELD_CLICKHOUSE_URL", bool(self.clickhouse_url)),
+            ("YIELDFIELD_CREDENTIALS_KEY", bool(self.credentials_key)),
+            ("YIELDFIELD_API_TOKENS", bool(self.api_tokens)),
+            ("YIELDFIELD_LOG_JSON=true", self.log_json),
+            ("YIELDFIELD_DEBUG=false", not self.debug),
+            ("YIELDFIELD_CONNECTOR_BASE_URL unset", self.connector_base_url is None),
+        ]
+        problems = [name for name, ok in checks if not ok]
+        if problems:
+            raise ValueError(f"Production misconfiguration: {', '.join(problems)} (§16).")
+        return self
 
 
 @lru_cache(maxsize=1)
