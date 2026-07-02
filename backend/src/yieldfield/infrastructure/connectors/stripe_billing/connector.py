@@ -14,6 +14,7 @@ unit-tested mappers. The read source is isolated behind those mappers, so it can
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import timedelta
 from typing import Any
 
 import stripe
@@ -36,6 +37,12 @@ from yieldfield.infrastructure.connectors.stripe_billing.mapping import (
 _API_KEY = "api_key"
 _WEBHOOK_SECRET = "webhook_secret"  # noqa: S105 - credential KEY name, not a secret value
 _PAGE_LIMIT = 100
+
+# Stripe can only filter invoices by CREATION time, but the money path means "billing
+# period" by a window (reconciliation reads select by period, §13). Invoices finalize
+# after their period (arrears) or before it (upfront), so scan a padded created-range
+# and keep exactly the invoices whose PERIOD overlaps the window (audit API-1).
+_CREATED_SCAN_PAD = timedelta(days=45)
 
 
 class StripeBillingConnector(BaseConnector):
@@ -66,8 +73,8 @@ class StripeBillingConnector(BaseConnector):
         invoices = v1.invoices.list(
             params={
                 "created": {
-                    "gte": int(window.start.timestamp()),
-                    "lt": int(window.end.timestamp()),
+                    "gte": int((window.start - _CREATED_SCAN_PAD).timestamp()),
+                    "lt": int((window.end + _CREATED_SCAN_PAD).timestamp()),
                 },
                 "limit": _PAGE_LIMIT,
                 "expand": ["data.lines"],
@@ -91,7 +98,9 @@ class StripeBillingConnector(BaseConnector):
                     for line in inv.lines.data
                 ],
             }
-            yield invoice_from_stripe(self._tenant_id, raw)
+            invoice = invoice_from_stripe(self._tenant_id, raw)
+            if invoice.period.overlaps(window):
+                yield invoice
 
     def pull_usage_events(self, window: TimeWindow) -> Iterable[UsageEvent]:
         v1 = self._v1()
