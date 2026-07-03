@@ -68,8 +68,26 @@ services:
       YIELDFIELD_DATABASE_URL: postgresql://${POSTGRES_USER:-yieldfield}:${POSTGRES_PASSWORD:-yieldfield}@postgres:5432/${POSTGRES_DB:-yieldfield}
       YIELDFIELD_CLICKHOUSE_URL: http://${CLICKHOUSE_USER:-yieldfield}:${CLICKHOUSE_PASSWORD:-yieldfield}@clickhouse:8123/${CLICKHOUSE_DB:-yieldfield}
       YIELDFIELD_CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+      # Auth/cipher/flags pass through from .env (compose interpolates it automatically):
+      # without these the containerized API 401s every request (audit PR-2).
+      YIELDFIELD_API_TOKENS: ${YIELDFIELD_API_TOKENS:-}
+      YIELDFIELD_CREDENTIALS_KEY: ${YIELDFIELD_CREDENTIALS_KEY:-}
+      YIELDFIELD_INGESTION_ENABLED: ${YIELDFIELD_INGESTION_ENABLED:-false}
+      YIELDFIELD_CONNECTOR_BASE_URL: ${YIELDFIELD_CONNECTOR_BASE_URL:-}
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,7 +116,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

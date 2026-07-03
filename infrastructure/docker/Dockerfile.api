@@ -20,5 +20,9 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY backend/ ./
 RUN uv sync --frozen --no-dev
 
+# Run as an unprivileged user (audit M14): the app needs no root capability.
+RUN useradd --create-home --uid 10001 app && chown -R app:app /app
+USER app
+
 EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "yieldfield.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

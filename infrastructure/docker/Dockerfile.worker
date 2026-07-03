@@ -18,4 +18,8 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY backend/ ./
 RUN uv sync --frozen --no-dev
 
+# Run as an unprivileged user (audit M14): the worker needs no root capability.
+RUN useradd --create-home --uid 10001 app && chown -R app:app /app
+USER app
+
 CMD ["uv", "run", "celery", "-A", "yieldfield.workers.celery_app", "worker", "--loglevel=info"]
