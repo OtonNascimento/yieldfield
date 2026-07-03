@@ -79,6 +79,23 @@ def test_build_authenticated_round_trips() -> None:
     assert isinstance(live, StripeBillingConnector)
 
 
+def test_build_authenticated_rejects_non_active_connector() -> None:
+    # Worker-path defense in depth (audit SE-5): a disabled connector must never be
+    # rebuilt into a live, credentialed client — regardless of how the job was enqueued.
+    from dataclasses import replace
+
+    from yieldfield.domain.billing.connector import ConnectorStatus
+
+    store = FakeConnectorStore()
+    service = _service(store)
+    connector = service.register(
+        TenantId("tenant-1"), ConnectorType.STRIPE_BILLING, {"api_key": "sk_test_1"}
+    )
+    store.connectors[str(connector.id)] = replace(connector, status=ConnectorStatus.DISABLED)
+    with pytest.raises(ConnectorError, match="not active"):
+        service.build_authenticated(TenantId("tenant-1"), connector.id)
+
+
 def test_build_authenticated_unknown_connector_raises() -> None:
     with pytest.raises(ConnectorError):
         _service(FakeConnectorStore()).build_authenticated(

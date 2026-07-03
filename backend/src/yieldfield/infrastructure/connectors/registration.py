@@ -81,6 +81,10 @@ class ConnectorRegistrationService:
         connector = self._store.get(tenant_id, connector_id)
         if connector is None:
             raise ConnectorError(f"Connector {connector_id!r} not found for tenant {tenant_id!r}.")
+        if connector.status is not ConnectorStatus.ACTIVE:
+            # Defense in depth (audit SE-5): a disabled connector must never be rebuilt
+            # into a live, credentialed client, however the request arrived.
+            raise ConnectorError(f"Connector {connector_id!r} is not active.")
         blob = self._store.load_credentials(tenant_id, connector_id)
         if blob is None:
             raise ConnectorError(f"No stored credentials for connector {connector_id!r}.")

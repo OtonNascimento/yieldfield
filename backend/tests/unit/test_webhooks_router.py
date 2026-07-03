@@ -29,12 +29,12 @@ def _settings() -> Settings:
     return Settings(_env_file=None)  # NOTE: no api_tokens — webhooks use no bearer auth
 
 
-def _connector() -> Connector:
+def _connector(status: ConnectorStatus = ConnectorStatus.ACTIVE) -> Connector:
     return Connector(
         id=ConnectorId("con_1"),
         tenant_id=TenantId("tenant-1"),
         connector_type=ConnectorType.STRIPE_BILLING,
-        status=ConnectorStatus.ACTIVE,
+        status=status,
     )
 
 
@@ -159,6 +159,41 @@ def test_connector_without_webhook_secret_fails_closed_with_400_and_enqueues_not
     )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "connector_auth_error"
+    assert submitter.submitted == []
+
+
+def test_oversize_payload_is_413_and_never_verified_nor_enqueued() -> None:
+    # The unauthenticated ingress caps body size BEFORE any cipher/verify work (audit SE-2a).
+    live = FakeLiveConnector(valid=True)
+    submitter = FakeSubmitter()
+    client = TestClient(_app(FakeStore(_connector()), FakeRegistration(live), submitter))
+    response = client.post(
+        "/api/v1/webhooks/con_1",
+        content=b"x" * (512 * 1024 + 1),
+        headers={"Stripe-Signature": "t=1,v1=abc"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+    assert live.verified == []
+    assert submitter.submitted == []
+
+
+def test_disabled_connector_reads_exactly_like_missing() -> None:
+    # A non-ACTIVE connector must stop accepting webhooks the moment disabling exists,
+    # and no oracle may distinguish disabled from unknown (§11, audit SE-5).
+    submitter = FakeSubmitter()
+    client = TestClient(
+        _app(
+            FakeStore(_connector(ConnectorStatus.DISABLED)),
+            FakeRegistration(FakeLiveConnector(valid=True)),
+            submitter,
+        )
+    )
+    response = client.post(
+        "/api/v1/webhooks/con_1", content=b"{}", headers={"Stripe-Signature": "t=1,v1=abc"}
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
     assert submitter.submitted == []
 
 

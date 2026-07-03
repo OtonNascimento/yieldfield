@@ -21,6 +21,7 @@ from yieldfield.api.errors.exceptions import (
     IngestionDisabledError,
     InvalidWebhookSignatureError,
     UnauthorizedError,
+    WebhookPayloadTooLargeError,
 )
 from yieldfield.application.errors import EntityNotFoundError
 from yieldfield.domain.shared.errors import InvalidFindingTransitionError
@@ -83,6 +84,7 @@ _TYPED_ERRORS: list[tuple[type[Exception], int, str]] = [
     (UnauthorizedError, status.HTTP_401_UNAUTHORIZED, "unauthorized"),
     (IngestionDisabledError, status.HTTP_403_FORBIDDEN, "ingestion_disabled"),
     (InvalidWebhookSignatureError, status.HTTP_400_BAD_REQUEST, "invalid_webhook_signature"),
+    (WebhookPayloadTooLargeError, status.HTTP_413_CONTENT_TOO_LARGE, "payload_too_large"),
     (EntityNotFoundError, status.HTTP_404_NOT_FOUND, "not_found"),
     (InvalidFindingTransitionError, status.HTTP_409_CONFLICT, "invalid_finding_transition"),
     (ConnectorAuthError, status.HTTP_400_BAD_REQUEST, "connector_auth_error"),

@@ -21,3 +21,7 @@ class IngestionDisabledError(ApiError):
 
 class InvalidWebhookSignatureError(ApiError):
     """Inbound webhook failed signature verification (§11) → 400 `invalid_webhook_signature`."""
+
+
+class WebhookPayloadTooLargeError(ApiError):
+    """Inbound webhook body exceeds the ingress cap (§11) → 413 `payload_too_large`."""
