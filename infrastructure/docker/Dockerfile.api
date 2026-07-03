@@ -20,9 +20,16 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY backend/ ./
 RUN uv sync --frozen --no-dev
 
+# Operational tooling: Alembic migrations + ClickHouse bootstrap live in ops/ so this
+# image can run the one-shot `migrate` step (audit PR-3). The compose `migrate` service
+# and the ops/README runbook invoke them; the server CMD below never does.
+COPY ops/ ./ops/
+
 # Run as an unprivileged user (audit M14): the app needs no root capability.
 RUN useradd --create-home --uid 10001 app && chown -R app:app /app
 USER app
 
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "yieldfield.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Invoke the venv binary directly: `uv run` would re-sync (and pull dev deps) at every
+# container start — the image is frozen at build time and must stay immutable at runtime.
+CMD ["/app/.venv/bin/uvicorn", "yieldfield.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

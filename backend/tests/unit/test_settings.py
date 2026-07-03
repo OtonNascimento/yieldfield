@@ -98,6 +98,18 @@ def test_production_rejects_debug_and_connector_base_url() -> None:
     assert "YIELDFIELD_CONNECTOR_BASE_URL unset" in message
 
 
+def test_empty_env_values_mean_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Compose/k8s pass-throughs surface unset vars as EMPTY strings; those must behave
+    # exactly like absent vars (twelve-factor), not crash the JSON-decoded fields at boot.
+    monkeypatch.setenv("YIELDFIELD_API_TOKENS", "")
+    monkeypatch.setenv("YIELDFIELD_CREDENTIALS_KEY", "")
+    monkeypatch.setenv("YIELDFIELD_CONNECTOR_BASE_URL", "")
+    settings = Settings(_env_file=None)
+    assert settings.api_tokens == {}
+    assert settings.credentials_key is None
+    assert settings.connector_base_url is None
+
+
 def test_non_production_environments_keep_permissive_defaults() -> None:
     for environment in ("local", "ci", "staging"):
         settings = Settings(_env_file=None, environment=environment)

@@ -89,11 +89,33 @@ services:
       retries: 10
       start_period: 15s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  # One-shot schema step (audit PR-3): a fresh stack has no tables until Alembic and the
+  # ClickHouse bootstrap run. api/worker wait for this to complete successfully.
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    environment: *backend-env
+    command:
+      [
+        "sh",
+        "-c",
+        "/app/.venv/bin/alembic -c ops/migrations/alembic.ini upgrade head && /app/.venv/bin/python ops/scripts/bootstrap_clickhouse.py",
+      ]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
 
   worker:
@@ -102,6 +124,8 @@ services:
       dockerfile: infrastructure/docker/Dockerfile.worker
     environment: *backend-env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:

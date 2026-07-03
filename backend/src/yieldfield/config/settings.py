@@ -29,6 +29,10 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         frozen=True,
+        # Compose/k8s pass-throughs surface unset vars as EMPTY strings; treat those
+        # exactly like absent vars (twelve-factor) instead of failing to JSON-decode
+        # complex fields (api_tokens) at boot.
+        env_ignore_empty=True,
     )
 
     # ── Application ──────────────────────────────────────────────────────────
