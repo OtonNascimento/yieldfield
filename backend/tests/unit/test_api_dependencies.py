@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 
 import pytest
@@ -26,27 +27,28 @@ def _settings() -> Settings:
 
 
 def test_current_tenant_resolves_token_to_tenant() -> None:
-    assert current_tenant(_settings(), authorization="Bearer tok-1") == TenantId("tenant-1")
+    resolved = asyncio.run(current_tenant(_settings(), authorization="Bearer tok-1"))
+    assert resolved == TenantId("tenant-1")
 
 
 def test_current_tenant_rejects_missing_header() -> None:
     with pytest.raises(UnauthorizedError):
-        current_tenant(_settings(), authorization=None)
+        asyncio.run(current_tenant(_settings(), authorization=None))
 
 
 def test_current_tenant_rejects_non_bearer_scheme() -> None:
     with pytest.raises(UnauthorizedError):
-        current_tenant(_settings(), authorization="Basic tok-1")
+        asyncio.run(current_tenant(_settings(), authorization="Basic tok-1"))
 
 
 def test_current_tenant_rejects_unknown_token() -> None:
     with pytest.raises(UnauthorizedError):
-        current_tenant(_settings(), authorization="Bearer nope")
+        asyncio.run(current_tenant(_settings(), authorization="Bearer nope"))
 
 
 def test_current_tenant_rejects_empty_bearer_token() -> None:
     with pytest.raises(UnauthorizedError):
-        current_tenant(_settings(), authorization="Bearer   ")
+        asyncio.run(current_tenant(_settings(), authorization="Bearer   "))
 
 
 def test_cursor_round_trips_and_is_opaque() -> None:

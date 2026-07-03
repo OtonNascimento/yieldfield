@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from yieldfield.api.errors.handlers import register_error_handlers
+from yieldfield.api.middleware import RequestContextMiddleware
 from yieldfield.api.v1.dependencies import database
 from yieldfield.api.v1.routers import connectors, findings, health, ingestion, jobs, reconciliations
 from yieldfield.api.webhooks.router import router as webhooks_router
@@ -54,6 +55,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Outermost (added last): every response — including CORS rejections — carries an id.
+    app.add_middleware(RequestContextMiddleware)
 
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_V1_PREFIX)

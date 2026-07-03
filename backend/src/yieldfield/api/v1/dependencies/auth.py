@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import structlog
 from fastapi import Depends, Header
 
 from yieldfield.api.errors.exceptions import UnauthorizedError
@@ -18,10 +19,12 @@ from yieldfield.domain.shared.ids import TenantId
 _BEARER_PREFIX = "Bearer "
 
 
-def current_tenant(
+async def current_tenant(
     settings: SettingsDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> TenantId:
+    # Async on purpose (no I/O): sync dependencies run in the threadpool, where the
+    # contextvars bind below would die with the thread's context copy (audit PR-4a).
     if not authorization or not authorization.startswith(_BEARER_PREFIX):
         raise UnauthorizedError("Missing or invalid bearer token.")
     token = authorization.removeprefix(_BEARER_PREFIX).strip()
@@ -30,6 +33,8 @@ def current_tenant(
     tenant_id = settings.api_tokens.get(token)
     if tenant_id is None:
         raise UnauthorizedError("Missing or invalid bearer token.")
+    # Correlate every log line of this request with the tenant (§11, audit PR-4a).
+    structlog.contextvars.bind_contextvars(tenant_id=tenant_id)
     return TenantId(tenant_id)
 
 
