@@ -21,6 +21,10 @@ celery_app = Celery(
     "yieldfield",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
+    # Load-bearing: `celery -A yieldfield.workers.celery_app worker` imports only THIS
+    # module — without `include`, a real worker registers no money-path tasks at all
+    # and every enqueue sits PENDING forever (tests import tasks explicitly, hiding it).
+    include=["yieldfield.workers.tasks"],
 )
 celery_app.conf.update(
     task_acks_late=True,  # resumable/idempotent posture for money-path jobs (§13)
@@ -28,6 +32,11 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     timezone="UTC",
     enable_utc=True,
+    # Periodic maintenance (audit WK-2): the compose worker runs with -B; multi-worker
+    # deployments must run exactly one beat process.
+    beat_schedule={
+        "sweep-stale-jobs": {"task": "yieldfield.sweep_stale_jobs", "schedule": 3600.0},
+    },
 )
 
 

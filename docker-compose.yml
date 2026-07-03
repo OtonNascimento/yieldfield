@@ -123,6 +123,17 @@ services:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.worker
     environment: *backend-env
+    # -B embeds the beat scheduler (stale-job sweep, audit WK-2). Single-instance only:
+    # multi-worker deployments run exactly one dedicated beat process instead.
+    command:
+      [
+        "/app/.venv/bin/celery",
+        "-A",
+        "yieldfield.workers.celery_app",
+        "worker",
+        "--loglevel=info",
+        "-B",
+      ]
     depends_on:
       migrate:
         condition: service_completed_successfully

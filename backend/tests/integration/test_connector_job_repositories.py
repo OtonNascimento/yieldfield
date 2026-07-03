@@ -108,3 +108,27 @@ def test_job_lifecycle_round_trip(session: Session) -> None:
 
     # Tenant isolation: another tenant cannot read this job.
     assert repo.get(TenantId("other"), "job_1") is None
+
+
+def test_stale_pending_sweep_read_filters_status_and_age(session: Session) -> None:
+    tid = TenantId("tenant-sweep")
+    SqlAlchemyTenantRepository(session).add(Tenant(id=tid, name="Sweep"))
+    session.flush()
+    repo = SqlAlchemyJobRepository(session)
+
+    def _job(job_id: str, status: JobStatus, created_at: datetime) -> Job:
+        return Job(
+            id=job_id,
+            tenant_id=tid,
+            job_type=JobType.INGEST_INVOICES,
+            status=status,
+            created_at=created_at,
+        )
+
+    repo.add(tid, _job("job_stale", JobStatus.PENDING, datetime(2026, 6, 1, tzinfo=UTC)))
+    repo.add(tid, _job("job_fresh", JobStatus.PENDING, datetime(2026, 6, 3, tzinfo=UTC)))
+    repo.add(tid, _job("job_running", JobStatus.RUNNING, datetime(2026, 6, 1, tzinfo=UTC)))
+    session.flush()
+
+    stale = repo.list_stale_pending(datetime(2026, 6, 2, tzinfo=UTC))
+    assert [j.id for j in stale] == ["job_stale"]  # PENDING and older than the cutoff only

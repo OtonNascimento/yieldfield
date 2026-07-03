@@ -8,6 +8,7 @@ injected; the caller owns the transaction boundary (application layer, Slice 3).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -308,6 +309,18 @@ class SqlAlchemyJobRepository:
             select(JobRow).where(JobRow.id == job_id, JobRow.tenant_id == str(tenant_id))
         ).first()
         return _to_job(row) if row is not None else None
+
+    def list_stale_pending(self, cutoff: datetime) -> Sequence[Job]:
+        """Sweep read (§3, audit WK-2): deliberately cross-tenant — the sweeper operates
+        on the whole operational ledger, and each returned Job carries its own tenant
+        for the scoped update. The other sanctioned non-prescoped read is
+        ConnectorRepository.find_by_id (webhook ingress)."""
+        rows = self._session.scalars(
+            select(JobRow)
+            .where(JobRow.status == JobStatus.PENDING.value, JobRow.created_at < cutoff)
+            .order_by(JobRow.created_at, JobRow.id)
+        ).all()
+        return [_to_job(r) for r in rows]
 
     def update(self, tenant_id: TenantId, job: Job) -> None:
         _guard(tenant_id, job.tenant_id)

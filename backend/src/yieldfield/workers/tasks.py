@@ -9,7 +9,7 @@ behind the API gate, §16): when off they fail the Job rather than silently pull
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Any
 
@@ -28,6 +28,7 @@ from yieldfield.infrastructure.analytics_store.clickhouse_usage_event_store impo
 )
 from yieldfield.infrastructure.connectors.registration import ConnectorRegistrationService
 from yieldfield.infrastructure.messaging.run_as_job import JobResult, run_as_job
+from yieldfield.infrastructure.messaging.sweep import sweep_stale_pending
 from yieldfield.infrastructure.persistence.engine import build_sessionmaker, create_db_engine
 from yieldfield.infrastructure.persistence.job import JobResultType
 from yieldfield.infrastructure.persistence.repositories import (
@@ -77,6 +78,18 @@ def _registration(session: Session) -> ConnectorRegistrationService:
 def _require_ingestion_enabled() -> None:
     if not get_settings().ingestion_enabled:
         raise RuntimeError("Ingestion is disabled (YIELDFIELD_INGESTION_ENABLED).")
+
+
+@celery_app.task(name="yieldfield.sweep_stale_jobs")  # type: ignore[untyped-decorator]  # Celery decorator is untyped
+def sweep_stale_jobs_task() -> int:
+    """Beat-scheduled (§3, audit WK-2): fail PENDING jobs that never reached a worker."""
+    older_than = timedelta(minutes=get_settings().job_pending_timeout_minutes)
+    with _session_factory()() as session:
+        return sweep_stale_pending(
+            jobs=SqlAlchemyJobRepository(session),
+            commit=session.commit,
+            older_than=older_than,
+        )
 
 
 @celery_app.task(name="yieldfield.run_reconciliation", bind=True)  # type: ignore[untyped-decorator]  # Celery decorator is untyped

@@ -52,6 +52,9 @@ class Settings(BaseSettings):
 
     # ── Async backbone (Celery + Redis, §13) ─────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
+    # A PENDING job older than this never reached a worker (enqueue failed after the
+    # commit, §3); the beat-scheduled sweep marks it FAILED (audit WK-2).
+    job_pending_timeout_minutes: int = 360
 
     # ── Datastores (§12) — wired in Slice 2; optional until then ─────────────
     database_url: str | None = None  # PostgreSQL OLTP (source of truth)
