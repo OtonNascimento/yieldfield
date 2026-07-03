@@ -23,11 +23,23 @@ def _normalize_url(url: str) -> str:
     return url
 
 
-def create_db_engine(database_url: str | None) -> Engine:
-    """Build the OLTP engine, or fail fast if no URL is configured (§16)."""
+def create_db_engine(
+    database_url: str | None, *, pool_size: int = 5, max_overflow: int = 10
+) -> Engine:
+    """Build the OLTP engine, or fail fast if no URL is configured (§16).
+
+    Pool limits are caller-supplied (Settings in the composition roots, audit PR-5);
+    the defaults match SQLAlchemy's so ad-hoc callers (tests, scripts) stay unchanged.
+    """
     if not database_url:
         raise PersistenceError("DATABASE_URL is required to build the OLTP engine (§16).")
-    return create_engine(_normalize_url(database_url), future=True, pool_pre_ping=True)
+    return create_engine(
+        _normalize_url(database_url),
+        future=True,
+        pool_pre_ping=True,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+    )
 
 
 def build_sessionmaker(engine: Engine) -> sessionmaker[Session]:

@@ -22,6 +22,17 @@ def test_create_engine_without_url_fails_fast() -> None:
         create_db_engine(None)
 
 
+def test_engine_pool_sizing_is_configurable() -> None:
+    # Pool limits come from Settings in production (audit PR-5); creation is lazy, so
+    # no database is contacted here.
+    from sqlalchemy.pool import QueuePool
+
+    engine = create_db_engine("postgresql://u:p@h:5432/db", pool_size=2, max_overflow=1)
+    assert isinstance(engine.pool, QueuePool)
+    assert engine.pool.size() == 2
+    engine.dispose()
+
+
 def test_plan_repo_rejects_tenant_mismatch_before_touching_db() -> None:
     from yieldfield.domain.billing.plan import Plan
     from yieldfield.domain.shared.ids import PlanId, TenantId

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from yieldfield.api.v1.dependencies.database import process_engine
 from yieldfield.config.settings import Settings
 from yieldfield.infrastructure.analytics_store.clickhouse_client import create_clickhouse_client
-from yieldfield.infrastructure.persistence.engine import create_db_engine
 
 _OK = "ok"
 _ERROR = "error"
@@ -22,12 +22,10 @@ def _check_postgres(settings: Settings) -> str:
     if not settings.database_url:
         return _SKIPPED
     try:
-        engine = create_db_engine(settings.database_url)
-        try:
-            with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-        finally:
-            engine.dispose()
+        # Reuse the process pool (audit PR-5): probes must not churn connections or
+        # tear anything down; pool_pre_ping revalidates stale connections for us.
+        with process_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
         return _OK
     except Exception:
         return _ERROR

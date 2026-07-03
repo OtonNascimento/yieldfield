@@ -23,3 +23,15 @@ def test_unknown_route_uses_error_envelope() -> None:
     # The standard envelope: { error: { code, message, details } } (§10).
     assert "error" in response.json()
     assert response.json()["error"]["code"] == "http_404"
+
+
+def test_shutdown_disposes_the_process_engine(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # Graceful shutdown releases pooled OLTP connections (audit PR-5).
+    from yieldfield.api.v1.dependencies import database
+
+    calls: list[str] = []
+    monkeypatch.setattr(database, "dispose_engine", lambda: calls.append("disposed"))
+    with TestClient(create_app()) as client:
+        assert client.get("/api/v1/health").status_code == 200
+        assert calls == []  # nothing disposed while serving
+    assert calls == ["disposed"]

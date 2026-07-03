@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # ── Datastores (§12) — wired in Slice 2; optional until then ─────────────
     database_url: str | None = None  # PostgreSQL OLTP (source of truth)
     clickhouse_url: str | None = None  # ClickHouse OLAP (usage events at scale)
+    # OLTP connection-pool limits (audit PR-5); SQLAlchemy defaults, tunable per deploy.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     # ── Connector credentials & auth (§11, §16) — required when used ──────────
     # Fernet key for the credential cipher; required only when a connector is

@@ -50,3 +50,36 @@ def test_unconfigured_dependencies_are_skipped_not_failed(
     assert response.status_code == 200
     assert response.json()["checks"]["postgres"] == "skipped"
     assert response.json()["checks"]["clickhouse"] == "skipped"
+
+
+def test_postgres_probe_reuses_the_process_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    # /ready used to build (and dispose) a fresh engine per probe — connection churn
+    # under orchestrator polling (audit PR-5). Probes must reuse the process pool.
+    class _FakeConn:
+        def __enter__(self) -> _FakeConn:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def execute(self, statement: object) -> None:
+            return None
+
+    class _FakeEngine:
+        def __init__(self) -> None:
+            self.connects = 0
+            self.disposed = False
+
+        def connect(self) -> _FakeConn:
+            self.connects += 1
+            return _FakeConn()
+
+        def dispose(self) -> None:
+            self.disposed = True
+
+    fake = _FakeEngine()
+    monkeypatch.setattr(readiness, "process_engine", lambda: fake)
+    settings = Settings(_env_file=None, database_url="postgresql://u:p@h:5432/db")
+    assert readiness._check_postgres(settings) == "ok"
+    assert fake.connects == 1
+    assert fake.disposed is False  # the probe never tears down the shared pool

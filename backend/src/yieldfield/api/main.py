@@ -8,16 +8,27 @@ The OpenAPI schema this app produces becomes the shared contract emitted to
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from yieldfield.api.errors.handlers import register_error_handlers
+from yieldfield.api.v1.dependencies import database
 from yieldfield.api.v1.routers import connectors, findings, health, ingestion, jobs, reconciliations
 from yieldfield.api.webhooks.router import router as webhooks_router
 from yieldfield.config.logging import configure_logging, get_logger
 from yieldfield.config.settings import Settings, get_settings
 
 API_V1_PREFIX = "/api/v1"
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    # Graceful shutdown releases the pooled OLTP connections (audit PR-5).
+    database.dispose_engine()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -30,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="Yieldfield API",
         version="0.0.0",
         debug=settings.debug,
+        lifespan=_lifespan,
         # Versioned OpenAPI surface (§10).
         openapi_url=f"{API_V1_PREFIX}/openapi.json",
         docs_url=f"{API_V1_PREFIX}/docs",

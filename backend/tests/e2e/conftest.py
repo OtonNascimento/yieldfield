@@ -120,7 +120,7 @@ def _clear_process_caches() -> None:
     from yieldfield.workers import tasks as worker_tasks
 
     get_settings.cache_clear()
-    database._session_factory.cache_clear()
+    database.dispose_engine()  # disposes the pool and clears engine + session caches
     worker_tasks._session_factory.cache_clear()
     worker_tasks._usage_event_store.cache_clear()
 
