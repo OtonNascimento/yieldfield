@@ -46,6 +46,8 @@ def test_migration_0002_upgrades_and_downgrades(fresh_pg_url: str) -> None:
     assert {"connectors", "jobs"} <= tables
     recon_cols = {c["name"] for c in inspector.get_columns("reconciliations")}
     assert {"executed_at", "rule_version"} <= recon_cols
+    job_cols = {c["name"] for c in inspector.get_columns("jobs")}
+    assert "attempts" in job_cols  # 0003: delivery-attempt cap (audit WK-1)
     engine.dispose()
 
     command.downgrade(cfg, "0001_oltp_schema")

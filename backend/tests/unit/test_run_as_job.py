@@ -15,13 +15,14 @@ TENANT = TenantId("t_1")
 FIXED_NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 
 
-def _job(status: JobStatus = JobStatus.PENDING) -> Job:
+def _job(status: JobStatus = JobStatus.PENDING, attempts: int = 0) -> Job:
     return Job(
         id="job_1",
         tenant_id=TENANT,
         job_type=JobType.RUN_RECONCILIATION,
         status=status,
         created_at=datetime(2026, 6, 1, tzinfo=UTC),
+        attempts=attempts,
     )
 
 
@@ -122,6 +123,45 @@ def test_missing_job_raises_messaging_error() -> None:
             job_id="job_1",
             work=lambda: None,
         )
+
+
+def test_running_transition_records_the_delivery_attempt() -> None:
+    ledger, tx = FakeLedger(_job()), Tx()
+    run_as_job(
+        jobs=ledger,
+        commit=tx.commit,
+        rollback=tx.rollback,
+        tenant_id=TENANT,
+        job_id="job_1",
+        work=lambda: None,
+        clock=lambda: FIXED_NOW,
+    )
+    running = ledger.updates[0]
+    assert running.status is JobStatus.RUNNING
+    assert running.attempts == 1  # each delivery is counted on the RUNNING transition
+
+
+def test_exhausted_deliveries_fail_the_job_without_rerunning_work() -> None:
+    # A payload that kills the worker is redelivered (acks_late); without a cap it loops
+    # forever re-marking RUNNING (audit WK-1). At the cap the job FAILS durably and the
+    # message is consumed (no re-raise).
+    ledger, tx = FakeLedger(_job(JobStatus.RUNNING, attempts=3)), Tx()
+    calls: list[str] = []
+    run_as_job(
+        jobs=ledger,
+        commit=tx.commit,
+        rollback=tx.rollback,
+        tenant_id=TENANT,
+        job_id="job_1",
+        work=lambda: calls.append("ran"),
+        clock=lambda: FIXED_NOW,
+    )
+    assert calls == []  # the poison payload never runs again
+    failed = ledger.updates[-1]
+    assert failed.status is JobStatus.FAILED
+    assert failed.finished_at == FIXED_NOW
+    assert failed.error is not None and "delivery attempts" in failed.error
+    assert tx.events == ["commit"]  # the FAILED record itself commits, nothing else
 
 
 @pytest.mark.parametrize("status", [JobStatus.SUCCEEDED, JobStatus.FAILED])

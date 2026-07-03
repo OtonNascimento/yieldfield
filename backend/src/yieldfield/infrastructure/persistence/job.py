@@ -44,6 +44,10 @@ class Job:
     result_type: JobResultType | None = None
     result_ref: str | None = None
     celery_task_id: str | None = None
+    # Deliveries consumed so far (§3, audit WK-1): incremented on each RUNNING
+    # transition; run_as_job fails the job at MAX_DELIVERY_ATTEMPTS instead of
+    # letting a worker-killing payload redeliver forever.
+    attempts: int = 0
 
     def __post_init__(self) -> None:
         if (self.result_type is None) != (self.result_ref is None):

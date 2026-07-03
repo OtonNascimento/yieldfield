@@ -28,6 +28,11 @@ JobResult = tuple[JobResultType, str]
 
 _TERMINAL = frozenset({JobStatus.SUCCEEDED, JobStatus.FAILED})
 
+# A payload that kills the worker outright is redelivered by acks_late and would loop
+# forever (audit WK-1). Each delivery counts on the RUNNING transition; at the cap the
+# job FAILS durably and the message is consumed.
+MAX_DELIVERY_ATTEMPTS = 3
+
 
 class MessagingError(Exception):
     """A job-orchestration failure (e.g. the Job row is missing)."""
@@ -62,9 +67,25 @@ def run_as_job(
     if job.status in _TERMINAL:
         log.info("job.redelivered_noop", status=job.status.value)
         return
+    if job.attempts >= MAX_DELIVERY_ATTEMPTS:
+        failed = replace(
+            job,
+            status=JobStatus.FAILED,
+            finished_at=clock(),
+            error=f"exceeded {MAX_DELIVERY_ATTEMPTS} delivery attempts; "
+            f"poison redelivery stopped (§3).",
+        )
+        jobs.update(tenant_id, failed)
+        commit()
+        log.error("job.delivery_exhausted", attempts=job.attempts)
+        return
 
     running = replace(
-        job, status=JobStatus.RUNNING, started_at=clock(), celery_task_id=celery_task_id
+        job,
+        status=JobStatus.RUNNING,
+        started_at=clock(),
+        celery_task_id=celery_task_id,
+        attempts=job.attempts + 1,
     )
     jobs.update(tenant_id, running)
     commit()

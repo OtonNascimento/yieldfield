@@ -275,6 +275,7 @@ def _job_row(job: Job) -> JobRow:
         result_type=job.result_type.value if job.result_type is not None else None,
         result_ref=job.result_ref,
         celery_task_id=job.celery_task_id,
+        attempts=job.attempts,
     )
 
 
@@ -291,6 +292,7 @@ def _to_job(row: JobRow) -> Job:
         result_type=JobResultType(row.result_type) if row.result_type is not None else None,
         result_ref=row.result_ref,
         celery_task_id=row.celery_task_id,
+        attempts=row.attempts,
     )
 
 
@@ -334,3 +336,4 @@ class SqlAlchemyJobRepository:
         row.result_type = job.result_type.value if job.result_type is not None else None
         row.result_ref = job.result_ref
         row.celery_task_id = job.celery_task_id
+        row.attempts = job.attempts
