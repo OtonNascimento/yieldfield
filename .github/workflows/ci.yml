@@ -117,3 +117,51 @@ jobs:
 
       - name: "OpenAPI contract check (drift fails the build, §10)"
         run: uv run python ../ops/scripts/export_openapi.py --check
+
+  images:
+    name: images (Dockerfile.api · Dockerfile.worker build)
+    runs-on: ubuntu-latest
+    # Advisory at first (audit PR-6): flip continue-on-error to false once the first
+    # green build on main confirms these commands work on the runners.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # Compose and the deploy scaffolding consume these images, but nothing built them
+      # in CI until now — Dockerfile rot only surfaced at deploy time (audit PR-6).
+      # Build-only: no registry, no push. Context is the repo root (backend/ + ops/).
+      - name: Build API image
+        run: docker build -f infrastructure/docker/Dockerfile.api .
+
+      - name: Build worker image
+        run: docker build -f infrastructure/docker/Dockerfile.worker .
+
+  dependency-audit:
+    name: dependency audit (pip-audit · npm audit)
+    runs-on: ubuntu-latest
+    # Advisory at first (audit PR-6): flip continue-on-error to false once the first
+    # triage pass is complete (known findings fixed or explicitly ignored via
+    # --ignore-vuln / npm overrides), so new advisories block instead of drown.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: "Audit backend dependencies (pip-audit over the frozen uv.lock export)"
+        working-directory: backend
+        # --disable-pip audits the fully-pinned export as-is: no resolution, no install.
+        run: |
+          uv export --frozen --no-emit-project --output-file requirements-audit.txt
+          uvx pip-audit --requirement requirements-audit.txt --disable-pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: "Audit frontend dependencies (npm audit, high and above)"
+        working-directory: frontend
+        run: npm audit --audit-level=high
