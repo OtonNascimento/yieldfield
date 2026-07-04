@@ -118,6 +118,24 @@ Implement the probabilistic/Bayesian scoring behind the `domain` scoring port, i
 findings reference the exact `ModelRun`. Keep it swappable; do not let it leak into API or UI.
 **Stop and report.**
 
+## Known product-correctness debts (named, with promotion triggers)
+
+These are deliberate Slice-3 simplifications documented in
+`backend/src/yieldfield/application/reconciliation/run_reconciliation.py`. They are
+correct-by-scope today but silently wrong for the tenants described below — resolve
+each BEFORE its trigger, not after (audit I-DOC).
+
+1. **Un-invoiced customers produce no findings.** Reconciliation iterates
+   (customer, invoice) pairs, so a customer with usage but no invoice in the window is
+   invisible — the purest "missed revenue" case yields zero findings. **Trigger:** before
+   the first production tenant whose leakage profile includes missed/skipped invoicing —
+   i.e., before claiming revenue-completeness for any real tenant.
+2. **Contract terms are ignored in plan attribution.** A customer's plan is taken from
+   all of their contracts, last contract wins per metric; `term_start`/`term_end` play no
+   role. A mid-window plan change prices findings against the wrong plan — plausible but
+   incorrect dollar amounts. **Trigger:** the first tenant with more than one contract
+   per (customer, metric) or any mid-window plan change.
+
 ## Definition of done for every slice
 
 Tested, type-clean, lint-clean, observable (logs/metrics/traces where it runs), traceable to a
