@@ -43,20 +43,18 @@ def test_beat_schedule_sweeps_stale_jobs_with_a_registered_task() -> None:
 
 
 def test_job_type_map_covers_exactly_the_exported_task_names() -> None:
-    # A task name the API enqueues but this map misses KeyErrors at submit time (500);
-    # exact coverage forces the map update alongside any new task constant (audit TE-4).
-    from yieldfield.api.v1.dependencies.services import (
-        _JOB_TYPE_BY_TASK,
-        INGEST_INVOICES_TASK,
-        INGEST_USAGE_EVENTS_TASK,
-        RUN_RECONCILIATION_TASK,
-    )
+    # The audited failure (TE-4): a new *_TASK constant wired into submit() without a
+    # map entry KeyErrors at submit time (500). The expected set is DERIVED from the
+    # module, so adding a constant without its map entry fails here, not in production.
+    from yieldfield.api.v1.dependencies import services
 
-    assert set(_JOB_TYPE_BY_TASK) == {
-        INGEST_INVOICES_TASK,
-        INGEST_USAGE_EVENTS_TASK,
-        RUN_RECONCILIATION_TASK,
+    exported = {
+        value
+        for name, value in vars(services).items()
+        if name.isupper() and name.endswith("_TASK") and isinstance(value, str)
     }
+    assert exported, "task-name constant derivation must not silently go empty"
+    assert set(services._JOB_TYPE_BY_TASK) == exported
 
 
 # --- Task-body composition guards (audit TE-3) -------------------------------------
@@ -129,7 +127,9 @@ def test_ingest_invoices_fails_the_job_when_the_flag_is_off(
 
     factory = _sqlite_sessions()
     _seed_pending_job(factory, tenant_ids=("tenant-a",), job_id="job-1")
-    settings = Settings(_env_file=None, ingestion_enabled=False)
+    # environment pinned: an ambient YIELDFIELD_ENVIRONMENT=production would otherwise
+    # trip the production-invariants validator at construction.
+    settings = Settings(_env_file=None, environment="local", ingestion_enabled=False)
     monkeypatch.setattr(tasks, "_session_factory", lambda: factory)
     monkeypatch.setattr(tasks, "get_settings", lambda: settings)
 
@@ -163,12 +163,17 @@ def test_ingest_invoices_fails_when_the_connector_belongs_to_another_tenant(
                 tenant_id="tenant-b",
                 connector_type="stripe_billing",
                 status="active",
+                # Deliberately NOT valid Fernet: any cross-tenant decrypt attempt would
+                # raise CredentialCipherError and fail the raises-match below.
                 encrypted_credentials=b"opaque",
             )
         )
         session.commit()
     settings = Settings(
-        _env_file=None, ingestion_enabled=True, credentials_key=Fernet.generate_key().decode()
+        _env_file=None,
+        environment="local",
+        ingestion_enabled=True,
+        credentials_key=Fernet.generate_key().decode(),
     )
     monkeypatch.setattr(tasks, "_session_factory", lambda: factory)
     monkeypatch.setattr(tasks, "get_settings", lambda: settings)
@@ -178,4 +183,4 @@ def test_ingest_invoices_fails_when_the_connector_belongs_to_another_tenant(
 
     status, error = _job_status_and_error(factory, "tenant-a", "job-1")
     assert status is JobStatus.FAILED
-    assert "not found" in error
+    assert "not found for tenant" in error
