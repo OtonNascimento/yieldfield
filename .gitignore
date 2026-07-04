@@ -21,6 +21,8 @@ venv/
 htmlcov/
 coverage.xml
 .hypothesis/
+# CI dependency-audit export (regenerated from uv.lock every run)
+requirements-audit.txt
 
 # ── Node / frontend ─────────────────────────────────────────────────────────
 node_modules/

@@ -119,34 +119,40 @@ jobs:
         run: uv run python ../ops/scripts/export_openapi.py --check
 
   images:
-    name: images (Dockerfile.api · Dockerfile.worker build)
+    name: images (Dockerfile.api · Dockerfile.worker · Dockerfile.frontend build)
     runs-on: ubuntu-latest
-    # Advisory at first (audit PR-6): flip continue-on-error to false once the first
-    # green build on main confirms these commands work on the runners.
+    # Advisory at first (audit PR-6): flip continue-on-error to false once one main-branch
+    # run shows all three build steps succeeded in the job logs (the check itself stays
+    # green while this flag is set, so look at the steps, not the checks list).
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      # Compose and the deploy scaffolding consume these images, but nothing built them
-      # in CI until now — Dockerfile rot only surfaced at deploy time (audit PR-6).
-      # Build-only: no registry, no push. Context is the repo root (backend/ + ops/).
+      # Compose consumes all three images, but nothing built them in CI until now —
+      # Dockerfile rot only surfaced at deploy time (audit PR-6). Build-only: no
+      # registry, no push. Context is the repo root for every Dockerfile.
       - name: Build API image
         run: docker build -f infrastructure/docker/Dockerfile.api .
 
       - name: Build worker image
         run: docker build -f infrastructure/docker/Dockerfile.worker .
 
-  dependency-audit:
-    name: dependency audit (pip-audit · npm audit)
+      - name: Build frontend image
+        run: docker build -f infrastructure/docker/Dockerfile.frontend .
+
+  # The two dependency audits are separate jobs so one ecosystem's failure never skips
+  # the other's steps, and each flips to blocking on its own triage schedule.
+  dependency-audit-backend:
+    name: dependency audit (pip-audit)
     runs-on: ubuntu-latest
     # Advisory at first (audit PR-6): flip continue-on-error to false once the first
-    # triage pass is complete (known findings fixed or explicitly ignored via
-    # --ignore-vuln / npm overrides), so new advisories block instead of drown.
+    # triage pass is complete (known findings fixed or explicitly --ignore-vuln'd), so
+    # new advisories block instead of drown.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
+      - name: Install uv (also provisions Python 3.12)
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -154,14 +160,26 @@ jobs:
       - name: "Audit backend dependencies (pip-audit over the frozen uv.lock export)"
         working-directory: backend
         # --disable-pip audits the fully-pinned export as-is: no resolution, no install.
+        # pip-audit is version-pinned so advisory runs stay reproducible.
         run: |
           uv export --frozen --no-emit-project --output-file requirements-audit.txt
-          uvx pip-audit --requirement requirements-audit.txt --disable-pip
+          uvx pip-audit==2.10.1 --requirement requirements-audit.txt --disable-pip
+
+  dependency-audit-frontend:
+    name: dependency audit (npm audit)
+    runs-on: ubuntu-latest
+    # Advisory at first (audit PR-6): flip continue-on-error to false once the first
+    # triage pass is complete (known findings fixed or resolved via npm overrides), so
+    # new advisories block instead of drown.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: "Audit frontend dependencies (npm audit, high and above)"
+        # npm audit needs only package-lock.json + registry access — no npm ci.
         working-directory: frontend
         run: npm audit --audit-level=high
