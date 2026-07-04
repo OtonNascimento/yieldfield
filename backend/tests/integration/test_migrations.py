@@ -48,6 +48,11 @@ def test_migration_0002_upgrades_and_downgrades(fresh_pg_url: str) -> None:
     assert {"executed_at", "rule_version"} <= recon_cols
     job_cols = {c["name"] for c in inspector.get_columns("jobs")}
     assert "attempts" in job_cols  # 0003: delivery-attempt cap (audit WK-1)
+    # 0004: composite reconciliation read indexes (audit PF-4)
+    invoice_indexes = {ix["name"]: ix["column_names"] for ix in inspector.get_indexes("invoices")}
+    assert invoice_indexes["ix_invoices_tenant_period_start"] == ["tenant_id", "period_start"]
+    contract_indexes = {ix["name"]: ix["column_names"] for ix in inspector.get_indexes("contracts")}
+    assert contract_indexes["ix_contracts_tenant_customer"] == ["tenant_id", "customer_id"]
     engine.dispose()
 
     command.downgrade(cfg, "0001_oltp_schema")
@@ -59,4 +64,8 @@ def test_migration_0002_upgrades_and_downgrades(fresh_pg_url: str) -> None:
     recon_cols = {c["name"] for c in inspector.get_columns("reconciliations")}
     assert "executed_at" not in recon_cols
     assert "rule_version" not in recon_cols
+    invoice_index_names = {ix["name"] for ix in inspector.get_indexes("invoices")}
+    assert "ix_invoices_tenant_period_start" not in invoice_index_names
+    contract_index_names = {ix["name"] for ix in inspector.get_indexes("contracts")}
+    assert "ix_contracts_tenant_customer" not in contract_index_names
     engine.dispose()

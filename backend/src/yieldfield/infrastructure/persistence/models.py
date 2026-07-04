@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -39,9 +40,10 @@ class TenantRow(Base):
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # Relationships exist so that SQLAlchemy's unit-of-work topological sort respects
-    # FK ordering when TenantRow and its children are added to the same session without
-    # being linked through the ORM object graph (e.g. integration tests, bulk inserts).
+    # These relationships order ONLY tenant→child inserts in the unit of work (a tenant
+    # row flushes before rows referencing it). Nothing orders siblings against each other
+    # — ContractRow.plan_id has no relationship — so same-session bulk adds must flush
+    # between dependent siblings (see tests/e2e/test_money_path.py). Audit AR-2.
     plans: Mapped[list[PlanRow]] = relationship(back_populates="tenant")
     contracts: Mapped[list[ContractRow]] = relationship(back_populates="tenant")
     invoices: Mapped[list[InvoiceRow]] = relationship(back_populates="tenant")
@@ -67,6 +69,9 @@ class PlanRow(Base):
 
 class ContractRow(Base):
     __tablename__ = "contracts"
+    # Reconciliation read path (§8): contracts are fetched per (tenant, customer).
+    # Created by migration 0004; the unit parity test keeps both in sync (audit PF-4).
+    __table_args__ = (Index("ix_contracts_tenant_customer", "tenant_id", "customer_id"),)
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
@@ -81,6 +86,9 @@ class ContractRow(Base):
 
 class InvoiceRow(Base):
     __tablename__ = "invoices"
+    # Reconciliation read path (§8): invoices are windowed per tenant by period_start.
+    # Created by migration 0004; the unit parity test keeps both in sync (audit PF-4).
+    __table_args__ = (Index("ix_invoices_tenant_period_start", "tenant_id", "period_start"),)
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
