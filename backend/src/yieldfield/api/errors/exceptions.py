@@ -25,3 +25,7 @@ class InvalidWebhookSignatureError(ApiError):
 
 class WebhookPayloadTooLargeError(ApiError):
     """Inbound webhook body exceeds the ingress cap (§11) → 413 `payload_too_large`."""
+
+
+class InvalidCursorError(ApiError):
+    """Malformed/tampered pagination cursor (§10) → 400 `invalid_cursor`."""

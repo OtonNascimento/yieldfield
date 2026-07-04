@@ -14,7 +14,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, Query
+
+from yieldfield.api.errors.exceptions import InvalidCursorError
 
 _PREFIX = "o:"
 
@@ -32,9 +34,8 @@ def decode_cursor(cursor: str) -> int:
         if offset < 0:
             raise ValueError(text)
     except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid pagination cursor."
-        ) from exc
+        # Typed (audit API-3): the envelope carries `invalid_cursor`, not a bare http_400.
+        raise InvalidCursorError("Invalid pagination cursor.") from exc
     return offset
 
 

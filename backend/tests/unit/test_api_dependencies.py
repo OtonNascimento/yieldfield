@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Sequence
 
 import pytest
-from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+from fastapi.testclient import TestClient
 
-from yieldfield.api.errors.exceptions import UnauthorizedError
+from yieldfield.api.errors.exceptions import InvalidCursorError, UnauthorizedError
 from yieldfield.api.v1.dependencies.auth import current_tenant
 from yieldfield.api.v1.dependencies.pagination import (
     PageParams,
@@ -26,29 +28,49 @@ def _settings() -> Settings:
     return Settings(_env_file=None, api_tokens={"tok-1": "tenant-1"})
 
 
+def _creds(token: str) -> HTTPAuthorizationCredentials:
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+
 def test_current_tenant_resolves_token_to_tenant() -> None:
-    resolved = asyncio.run(current_tenant(_settings(), authorization="Bearer tok-1"))
+    resolved = asyncio.run(current_tenant(_settings(), credentials=_creds("tok-1")))
     assert resolved == TenantId("tenant-1")
 
 
-def test_current_tenant_rejects_missing_header() -> None:
+def test_current_tenant_rejects_missing_credentials() -> None:
     with pytest.raises(UnauthorizedError):
-        asyncio.run(current_tenant(_settings(), authorization=None))
-
-
-def test_current_tenant_rejects_non_bearer_scheme() -> None:
-    with pytest.raises(UnauthorizedError):
-        asyncio.run(current_tenant(_settings(), authorization="Basic tok-1"))
+        asyncio.run(current_tenant(_settings(), credentials=None))
 
 
 def test_current_tenant_rejects_unknown_token() -> None:
     with pytest.raises(UnauthorizedError):
-        asyncio.run(current_tenant(_settings(), authorization="Bearer nope"))
+        asyncio.run(current_tenant(_settings(), credentials=_creds("nope")))
 
 
 def test_current_tenant_rejects_empty_bearer_token() -> None:
     with pytest.raises(UnauthorizedError):
-        asyncio.run(current_tenant(_settings(), authorization="Bearer   "))
+        asyncio.run(current_tenant(_settings(), credentials=_creds("   ")))
+
+
+def test_non_bearer_scheme_is_401_at_the_route() -> None:
+    # Scheme parsing now lives in HTTPBearer (the OpenAPI securityScheme, audit API-2);
+    # a Basic header must still resolve to the same 401 envelope.
+    from yieldfield.api.main import create_app
+    from yieldfield.api.v1.dependencies.services import get_connector_store
+    from yieldfield.api.v1.dependencies.settings import get_app_settings
+    from yieldfield.domain.billing.connector import Connector
+
+    class _EmptyStore:
+        def list_for_tenant(self, tenant_id: object) -> Sequence[Connector]:
+            return []
+
+    settings = _settings()
+    app = create_app(settings)
+    app.dependency_overrides[get_app_settings] = lambda: settings
+    app.dependency_overrides[get_connector_store] = lambda: _EmptyStore()
+    response = TestClient(app).get("/api/v1/connectors", headers={"Authorization": "Basic tok-1"})
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
 
 
 def test_cursor_round_trips_and_is_opaque() -> None:
@@ -57,10 +79,10 @@ def test_cursor_round_trips_and_is_opaque() -> None:
     assert decode_cursor(cursor) == 150
 
 
-def test_garbage_cursor_is_a_400() -> None:
-    with pytest.raises(HTTPException) as excinfo:
+def test_garbage_cursor_raises_the_typed_error() -> None:
+    # Typed (audit API-3): the envelope carries `invalid_cursor`, not a generic http_400.
+    with pytest.raises(InvalidCursorError):
         decode_cursor("not-a-cursor")
-    assert excinfo.value.status_code == 400
 
 
 @pytest.mark.parametrize(
@@ -70,10 +92,9 @@ def test_garbage_cursor_is_a_400() -> None:
         base64.urlsafe_b64encode(b"x:5").decode(),  # wrong prefix inside valid base64
     ],
 )
-def test_semantic_cursor_guards_are_a_400(raw: str) -> None:
-    with pytest.raises(HTTPException) as excinfo:
+def test_semantic_cursor_guards_raise_the_typed_error(raw: str) -> None:
+    with pytest.raises(InvalidCursorError):
         decode_cursor(raw)
-    assert excinfo.value.status_code == 400
 
 
 def test_paginate_slices_and_signals_the_last_page() -> None:

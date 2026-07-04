@@ -8,8 +8,10 @@ from fastapi.testclient import TestClient
 
 from yieldfield.api.errors.exceptions import (
     IngestionDisabledError,
+    InvalidCursorError,
     InvalidWebhookSignatureError,
     UnauthorizedError,
+    WebhookPayloadTooLargeError,
 )
 from yieldfield.api.errors.handlers import register_error_handlers
 from yieldfield.application.errors import EntityNotFoundError
@@ -23,6 +25,8 @@ _CASES = [
     (EntityNotFoundError("Finding 'f_1' not found."), 404, "not_found"),
     (InvalidFindingTransitionError("Cannot move."), 409, "invalid_finding_transition"),
     (ConnectorAuthError("Missing required credential: 'api_key'."), 400, "connector_auth_error"),
+    (WebhookPayloadTooLargeError("Payload exceeds cap."), 413, "payload_too_large"),
+    (InvalidCursorError("Invalid pagination cursor."), 400, "invalid_cursor"),
 ]
 
 

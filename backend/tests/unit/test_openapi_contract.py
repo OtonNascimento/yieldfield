@@ -39,6 +39,16 @@ def test_openapi_documents_the_v1_surface() -> None:
     assert expected <= paths
 
 
+def test_bearer_auth_is_a_security_scheme() -> None:
+    # The generated Slice-4 client models auth from securitySchemes (audit API-2).
+    schema = create_app(Settings(_env_file=None)).openapi()
+    assert "HTTPBearer" in schema["components"]["securitySchemes"]
+    connectors_get = schema["paths"]["/api/v1/connectors"]["get"]
+    assert {"HTTPBearer": []} in connectors_get["security"]
+    webhook_post = schema["paths"]["/api/v1/webhooks/{connector_id}"]["post"]
+    assert "security" not in webhook_post  # the SIGNATURE is the auth (decision F)
+
+
 def test_committed_schema_matches_the_app() -> None:
     # The drift guard's core assertion, runnable locally (CI runs the exporter --check).
     assert COMMITTED_SCHEMA.exists(), "run: uv run python ../ops/scripts/export_openapi.py"
