@@ -52,9 +52,7 @@ def test_current_tenant_rejects_empty_bearer_token() -> None:
         asyncio.run(current_tenant(_settings(), credentials=_creds("   ")))
 
 
-def test_non_bearer_scheme_is_401_at_the_route() -> None:
-    # Scheme parsing now lives in HTTPBearer (the OpenAPI securityScheme, audit API-2);
-    # a Basic header must still resolve to the same 401 envelope.
+def _connectors_client() -> TestClient:
     from yieldfield.api.main import create_app
     from yieldfield.api.v1.dependencies.services import get_connector_store
     from yieldfield.api.v1.dependencies.settings import get_app_settings
@@ -68,9 +66,38 @@ def test_non_bearer_scheme_is_401_at_the_route() -> None:
     app = create_app(settings)
     app.dependency_overrides[get_app_settings] = lambda: settings
     app.dependency_overrides[get_connector_store] = lambda: _EmptyStore()
-    response = TestClient(app).get("/api/v1/connectors", headers={"Authorization": "Basic tok-1"})
+    return TestClient(app)
+
+
+def test_non_bearer_scheme_is_401_at_the_route() -> None:
+    # Scheme parsing now lives in HTTPBearer (the OpenAPI securityScheme, audit API-2);
+    # a Basic header must still resolve to the same 401 envelope.
+    response = _connectors_client().get(
+        "/api/v1/connectors", headers={"Authorization": "Basic tok-1"}
+    )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_lowercase_bearer_scheme_authenticates_at_the_route() -> None:
+    # HTTPBearer matches the scheme case-insensitively (RFC 7235). This deliberately
+    # liberalizes the old exact-"Bearer " check; pin it so a future refactor doesn't
+    # silently flip it back.
+    response = _connectors_client().get(
+        "/api/v1/connectors", headers={"Authorization": "bearer tok-1"}
+    )
+    assert response.status_code == 200
+
+
+def test_garbage_cursor_is_400_invalid_cursor_at_the_route() -> None:
+    # The production raise happens inside dependency solving (page_params), not a route
+    # body — pin the full path the audit finding (API-3) was about.
+    response = _connectors_client().get(
+        "/api/v1/connectors?cursor=not-a-cursor",
+        headers={"Authorization": "Bearer tok-1"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_cursor"
 
 
 def test_cursor_round_trips_and_is_opaque() -> None:
