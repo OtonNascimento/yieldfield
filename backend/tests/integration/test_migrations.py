@@ -1,4 +1,4 @@
-"""Migration 0002 applies and reverses on a disposable Postgres (§12).
+"""Migrations after 0001 apply and reverse on a disposable Postgres (§12).
 
 Uses its OWN throwaway container so it never downgrades the session-scoped
 `migrated_engine` database that the other integration tests share.
@@ -32,7 +32,7 @@ def fresh_pg_url() -> Iterator[str]:
 
 
 @pytest.mark.integration
-def test_migration_0002_upgrades_and_downgrades(fresh_pg_url: str) -> None:
+def test_migrations_after_0001_upgrade_and_downgrade(fresh_pg_url: str) -> None:
     from alembic import command
     from alembic.config import Config
 

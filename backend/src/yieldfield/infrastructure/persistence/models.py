@@ -43,7 +43,7 @@ class TenantRow(Base):
     # These relationships order ONLY tenant→child inserts in the unit of work (a tenant
     # row flushes before rows referencing it). Nothing orders siblings against each other
     # — ContractRow.plan_id has no relationship — so same-session bulk adds must flush
-    # between dependent siblings (see tests/e2e/test_money_path.py). Audit AR-2.
+    # between dependent siblings (see backend/tests/e2e/test_money_path.py). Audit AR-2.
     plans: Mapped[list[PlanRow]] = relationship(back_populates="tenant")
     contracts: Mapped[list[ContractRow]] = relationship(back_populates="tenant")
     invoices: Mapped[list[InvoiceRow]] = relationship(back_populates="tenant")
