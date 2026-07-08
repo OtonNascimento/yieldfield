@@ -13,7 +13,8 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api": "openapi-typescript ../contracts/openapi/openapi.json -o ../contracts/generated/typescript/api.d.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
@@ -33,6 +34,7 @@
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.12.0",
     "jsdom": "^25.0.1",
+    "openapi-typescript": "^7.4.0",
     "prettier": "^3.3.3",
     "stylelint": "^16.10.0",
     "stylelint-config-standard": "^36.0.1",
