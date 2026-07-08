@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
+from yieldfield.domain.billing.contract import Contract
 from yieldfield.domain.billing.invoice import Invoice, InvoiceLineItem
 from yieldfield.domain.billing.plan import Plan
 from yieldfield.domain.billing.tenant import Tenant
@@ -17,6 +18,7 @@ from yieldfield.domain.findings.recovery_status import RecoveryStatus
 from yieldfield.domain.findings.severity import Severity
 from yieldfield.domain.reconciliation.reconciliation import Reconciliation
 from yieldfield.domain.shared.ids import (
+    ContractId,
     FindingId,
     InvoiceId,
     InvoiceLineItemId,
@@ -27,6 +29,7 @@ from yieldfield.domain.shared.ids import (
 from yieldfield.domain.shared.money import Money
 from yieldfield.domain.shared.time_window import TimeWindow
 from yieldfield.infrastructure.persistence.repositories import (
+    SqlAlchemyContractRepository,
     SqlAlchemyFindingRepository,
     SqlAlchemyInvoiceRepository,
     SqlAlchemyPlanRepository,
@@ -50,6 +53,31 @@ def _plan(tid: str, pid: str) -> Plan:
         name="API calls",
         metric="api_call",
         unit_price=Money.of("0.0000004", "USD"),
+    )
+
+
+def _window(y1: int, m1: int, d1: int, y2: int, m2: int, d2: int) -> TimeWindow:
+    return TimeWindow(datetime(y1, m1, d1, tzinfo=UTC), datetime(y2, m2, d2, tzinfo=UTC))
+
+
+def _invoice(tid: str, iid: str, period: TimeWindow) -> Invoice:
+    return Invoice(
+        id=InvoiceId(iid),
+        tenant_id=TenantId(tid),
+        customer_id="cus_1",
+        period=period,
+        currency="USD",
+        line_items=(),
+    )
+
+
+def _contract(tid: str, cid: str, customer_id: str, plan_id: str) -> Contract:
+    return Contract(
+        id=ContractId(cid),
+        tenant_id=TenantId(tid),
+        customer_id=customer_id,
+        plan_id=PlanId(plan_id),
+        term=_WINDOW,
     )
 
 
@@ -82,6 +110,43 @@ def test_invoice_round_trips_with_line_items(session: Session) -> None:
     repo.add(TenantId("t_1"), invoice)
     session.flush()
     assert repo.get(TenantId("t_1"), InvoiceId("in_1")) == invoice
+
+
+def test_list_in_window_selects_by_period_start_within_window(session: Session) -> None:
+    SqlAlchemyTenantRepository(session).add(_tenant("t_1"))
+    SqlAlchemyTenantRepository(session).add(_tenant("t_2"))
+    repo = SqlAlchemyInvoiceRepository(session)
+    # In: period_start inside [Jan 1, Feb 1).
+    repo.add(TenantId("t_1"), _invoice("t_1", "in_in", _window(2026, 1, 10, 2026, 2, 10)))
+    # Out: overlaps the window but period_start precedes it — the partitioning
+    # semantic: an invoice reconciles in the window containing its period_start.
+    repo.add(TenantId("t_1"), _invoice("t_1", "in_straddle", _window(2025, 12, 15, 2026, 1, 15)))
+    # Out: period_start == window.end (half-open [start, end)).
+    repo.add(TenantId("t_1"), _invoice("t_1", "in_next", _window(2026, 2, 1, 2026, 3, 1)))
+    # Out: another tenant's invoice inside the window (§11).
+    repo.add(TenantId("t_2"), _invoice("t_2", "in_other", _window(2026, 1, 20, 2026, 2, 20)))
+    session.flush()
+
+    listed = repo.list_in_window(TenantId("t_1"), _WINDOW)
+    assert [inv.id for inv in listed] == [InvoiceId("in_in")]
+
+
+def test_list_for_customer_is_tenant_and_customer_scoped(session: Session) -> None:
+    SqlAlchemyTenantRepository(session).add(_tenant("t_1"))
+    SqlAlchemyTenantRepository(session).add(_tenant("t_2"))
+    plans = SqlAlchemyPlanRepository(session)
+    plans.add(TenantId("t_1"), _plan("t_1", "pl_1"))
+    plans.add(TenantId("t_2"), _plan("t_2", "pl_2"))
+    session.flush()  # plans must hit the DB before contracts reference them (FK)
+
+    repo = SqlAlchemyContractRepository(session)
+    repo.add(TenantId("t_1"), _contract("t_1", "con_match", "cus_1", "pl_1"))
+    repo.add(TenantId("t_1"), _contract("t_1", "con_other_cus", "cus_2", "pl_1"))
+    repo.add(TenantId("t_2"), _contract("t_2", "con_other_tenant", "cus_1", "pl_2"))
+    session.flush()
+
+    listed = repo.list_for_customer(TenantId("t_1"), "cus_1")
+    assert [c.id for c in listed] == [ContractId("con_match")]
 
 
 def test_reconciliation_persists_findings_and_reads_back(session: Session) -> None:

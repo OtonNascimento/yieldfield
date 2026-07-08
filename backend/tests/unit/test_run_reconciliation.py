@@ -111,7 +111,7 @@ class FakeInvoiceRepo:
         return None
 
     def list_in_window(self, tenant_id: TenantId, window: TimeWindow) -> Sequence[Invoice]:
-        return list(self._invoices)
+        return [inv for inv in self._invoices if window.contains(inv.period.start)]
 
 
 class FakeUsageStore:
@@ -122,7 +122,7 @@ class FakeUsageStore:
         return None
 
     def query(self, tenant_id: TenantId, window: TimeWindow) -> Sequence[UsageEvent]:
-        return list(self._events)
+        return [e for e in self._events if window.contains(e.occurred_at)]
 
 
 class FakeContractRepo:
