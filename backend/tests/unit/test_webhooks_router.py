@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -15,6 +15,7 @@ from yieldfield.api.v1.dependencies.services import (
     get_registration_service,
 )
 from yieldfield.api.v1.dependencies.settings import get_app_settings
+from yieldfield.api.webhooks.router import _MAX_PAYLOAD_BYTES
 from yieldfield.config.settings import Settings
 from yieldfield.domain.billing.connector import Connector, ConnectorStatus, ConnectorType
 from yieldfield.domain.billing.connector_port import ConnectorCredentials
@@ -170,6 +171,66 @@ def test_oversize_payload_is_413_and_never_verified_nor_enqueued() -> None:
     response = client.post(
         "/api/v1/webhooks/con_1",
         content=b"x" * (512 * 1024 + 1),
+        headers={"Stripe-Signature": "t=1,v1=abc"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+    assert live.verified == []
+    assert submitter.submitted == []
+
+
+def _oversized_chunks() -> Iterator[bytes]:
+    for _ in range(9):  # 9 x 64 KiB = 576 KiB > 512 KiB cap
+        yield b"x" * 65536
+
+
+def test_oversized_chunked_body_without_content_length_is_413() -> None:
+    # A chunked body has no declared Content-Length, so only the body-reading
+    # path (not the cheap precheck) can reject it (audit SE-2a).
+    live = FakeLiveConnector(valid=True)
+    submitter = FakeSubmitter()
+    client = TestClient(_app(FakeStore(_connector()), FakeRegistration(live), submitter))
+    response = client.post(
+        "/api/v1/webhooks/con_1",
+        content=_oversized_chunks(),
+        headers={"Stripe-Signature": "t=1,v1=irrelevant"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+    assert live.verified == []
+    assert submitter.submitted == []
+
+
+def _chunks_of_size(total: int, chunk_size: int = 65536) -> Iterator[bytes]:
+    remaining = total
+    while remaining > 0:
+        n = min(chunk_size, remaining)
+        yield b"x" * n
+        remaining -= n
+
+
+def test_exact_cap_chunked_body_is_not_413() -> None:
+    # The boundary is strictly-greater-than: a body of exactly the cap must
+    # be accepted, pinning the streaming loop's `>` (not `>=`) comparison.
+    live = FakeLiveConnector(valid=True)
+    submitter = FakeSubmitter()
+    client = TestClient(_app(FakeStore(_connector()), FakeRegistration(live), submitter))
+    response = client.post(
+        "/api/v1/webhooks/con_1",
+        content=_chunks_of_size(_MAX_PAYLOAD_BYTES),
+        headers={"Stripe-Signature": "t=1,v1=abc"},
+    )
+    assert response.status_code == 202
+    assert live.verified[0][0] == b"x" * _MAX_PAYLOAD_BYTES
+
+
+def test_one_byte_over_cap_chunked_body_is_413() -> None:
+    live = FakeLiveConnector(valid=True)
+    submitter = FakeSubmitter()
+    client = TestClient(_app(FakeStore(_connector()), FakeRegistration(live), submitter))
+    response = client.post(
+        "/api/v1/webhooks/con_1",
+        content=_chunks_of_size(_MAX_PAYLOAD_BYTES + 1),
         headers={"Stripe-Signature": "t=1,v1=abc"},
     )
     assert response.status_code == 413

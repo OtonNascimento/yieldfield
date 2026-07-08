@@ -69,9 +69,18 @@ async def receive_webhook(
         # A non-ACTIVE connector reads exactly like a missing one: no oracle (§11, SE-5).
         raise EntityNotFoundError(f"Connector {connector_id!r} not found.")
 
-    payload = await request.body()
-    if len(payload) > _MAX_PAYLOAD_BYTES:  # clients may omit/underspecify content-length
-        raise WebhookPayloadTooLargeError(f"Webhook payload exceeds {_MAX_PAYLOAD_BYTES} bytes.")
+    received = 0
+    chunks: list[bytes] = []
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > _MAX_PAYLOAD_BYTES:
+            # Enforced WHILE reading (audit SE-2a): a chunked body without
+            # content-length must not buffer past the cap before rejection.
+            raise WebhookPayloadTooLargeError(
+                f"Webhook payload exceeds {_MAX_PAYLOAD_BYTES} bytes."
+            )
+        chunks.append(chunk)
+    payload = b"".join(chunks)
     live = registration.build_authenticated(connector.tenant_id, connector.id)
     if not live.verify_webhook(payload, stripe_signature):
         raise InvalidWebhookSignatureError("Webhook signature verification failed.")
