@@ -132,6 +132,11 @@ class SqlAlchemyInvoiceRepository:
         return mappers.to_invoice(row) if row is not None else None
 
     def list_in_window(self, tenant_id: TenantId, window: TimeWindow) -> Sequence[Invoice]:
+        # Selection is by `period_start` within the half-open window — the partitioning
+        # contract (§4.2): each invoice reconciles exactly once, in the window containing
+        # its period_start, and RunReconciliation loads usage over each selected invoice's
+        # FULL billing period. Overlap-based selection would double-reconcile straddling
+        # invoices across contiguous windows.
         rows = self._session.scalars(
             select(InvoiceRow)
             .where(

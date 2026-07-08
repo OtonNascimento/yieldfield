@@ -339,6 +339,32 @@ def test_customer_with_unresolvable_plan_is_skipped_and_run_still_persists() -> 
     assert repo.saved == [result]
 
 
+def test_usage_in_an_invoice_period_tail_beyond_the_window_is_reconciled() -> None:
+    # Selection is by period_start ∈ window, but this invoice's period runs past
+    # window.end — usage in that tail (Feb 1-14) belongs to the invoice and must be
+    # loaded and reconciled, not dropped by bounding the usage load to the window.
+    period = TimeWindow(datetime(2026, 1, 15, tzinfo=UTC), datetime(2026, 2, 15, tzinfo=UTC))
+    repo = FakeReconRepo()
+    service = _service(
+        invoices=[_invoice("inv_1", "cus_1", _line("api_call", "50", "5.00"), period=period)],
+        events=[
+            _event("u_1", "cus_1", "api_call", "100", datetime(2026, 1, 20, tzinfo=UTC)),
+            # Inside the invoice period but OUTSIDE the reconciliation window — the tail.
+            _event("u_2", "cus_1", "api_call", "40", datetime(2026, 2, 5, tzinfo=UTC)),
+            # Outside the invoice period — must not change the result.
+            _event("u_3", "cus_1", "api_call", "25", datetime(2026, 2, 20, tzinfo=UTC)),
+        ],
+        contracts=[_contract("con_1", "cus_1", "p_1")],
+        plans=[_plan("p_1", "api_call", "0.10")],
+        recon_repo=repo,
+    )
+    result = service.run(TENANT, JAN, RECON)
+    assert result.finding_count == 1
+    assert result.findings[0].leakage_type is LeakageType.UNBILLED_USAGE
+    # 140 used (100 on Jan 20 + 40 on Feb 5) - 50 billed = 90 unbilled x $0.10.
+    assert result.total_leakage() == Money.of("9.00", "USD")
+
+
 def test_rerun_with_same_id_produces_the_same_financial_result() -> None:
     # Convergence at the financial level: same inputs + same reconciliation_id ⇒ same findings/total.
     # (Storage-level idempotency on reconciliation_id is the repository's job, integration-tested in 3A.)

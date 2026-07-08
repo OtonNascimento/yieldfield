@@ -9,7 +9,11 @@ job (§8); a fresh id is a new historical run. Job-unaware (§3).
 Simplifications (this slice; named, not silent): a customer's plans are taken from all of that
 customer's contracts (last contract wins per metric — term-based disambiguation is future work);
 currency is taken from the window's invoices, defaulting to USD for an empty window (§4.2);
-uninvoiced usage and mixed-currency are out of scope (§13).
+uninvoiced usage and mixed-currency are out of scope (§13); invoice selection partitions by
+`period_start` — an invoice reconciles in the window containing its `period_start`, so contiguous
+windows reconcile every invoice exactly once (ingestion pulls by period *overlap*, which is
+broader by design) — and usage is loaded over the span covering every selected invoice's full
+billing period, so a period extending past `window.end` still reconciles against all its usage.
 """
 
 from __future__ import annotations
@@ -45,6 +49,17 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _usage_coverage_window(window: TimeWindow, invoices: Sequence[Invoice]) -> TimeWindow:
+    """The span usage must be loaded over so every selected invoice sees its FULL
+    billing period (§4.2): selection is by period_start ∈ window, but a period may
+    extend past window.end — usage in that tail belongs to the invoice."""
+    if not invoices:
+        return window
+    start = min(window.start, min(inv.period.start for inv in invoices))
+    end = max(window.end, max(inv.period.end for inv in invoices))
+    return TimeWindow(start, end)
+
+
 class RunReconciliation:
     def __init__(
         self,
@@ -75,7 +90,9 @@ class RunReconciliation:
         """Reconcile `window` for `tenant_id`, persist one Reconciliation, and return it."""
         invoices = list(self._invoices.list_in_window(tenant_id, window))
         invoices_by_customer = self._group_by_customer(invoices)
-        usage_by_customer = self._usage_by_customer(tenant_id, window)
+        usage_by_customer = self._usage_by_customer(
+            tenant_id, _usage_coverage_window(window, invoices)
+        )
 
         findings: list[Finding] = []
         for customer_id, customer_invoices in invoices_by_customer.items():
