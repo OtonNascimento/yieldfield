@@ -165,3 +165,8 @@ name = "Application depends only on the domain (not infrastructure)"
 type = "forbidden"
 source_modules = ["yieldfield.application"]
 forbidden_modules = ["yieldfield.infrastructure"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
