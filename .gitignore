@@ -45,3 +45,9 @@ Thumbs.db
 
 # ── Docker / local data volumes ─────────────────────────────────────────────
 .docker-data/
+
+.claude/worktrees/
+
+.claude/settings.local.json
+
+.claude/skills/
